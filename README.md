@@ -2,7 +2,7 @@
 
 NestJS backend template for routing, authentication, authorization, account management, persistent sessions, and administrator workflows.
 
-Companion frontend: [react-routing-authorization](https://github.com/aleksr777/react-routing-authorization)
+Companion frontend: [stitches-stories-frontend](https://github.com/aleksr777/stitches-stories-frontend)
 
 ## Security model
 
