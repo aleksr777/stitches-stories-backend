@@ -25,6 +25,10 @@ jobs:
     timeout-minutes: 15
 
     services:
+      redis:
+        image: redis:7.2
+        ports:
+          - 6379:6379
       postgres:
         image: postgres:17.5
         env:
@@ -86,3 +90,12 @@ jobs:
 
       - name: E2E tests
         run: npm run test:e2e -- --runInBand
+
+      - name: Start the application and verify the store API
+        run: |
+          npm run setup:local
+          npm run seed:demo
+          node dist/src/main.js > /tmp/stitches-smoke.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          npm run test:smoke || { cat /tmp/stitches-smoke.log; exit 1; }

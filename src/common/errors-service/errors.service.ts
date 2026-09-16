@@ -192,12 +192,7 @@ export class ErrorsService {
   }
 
   confirmRegistration(err: unknown): never {
-    if (
-      err instanceof BadRequestException ||
-      err instanceof UnauthorizedException
-    ) {
-      throw err;
-    }
+    if (err instanceof HttpException) throw err;
     this.default(err);
   }
 

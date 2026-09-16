@@ -1,23 +1,22 @@
 services:
   postgres:
     image: postgres:17.5
-    restart: unless-stopped
-    container_name: postgres_db
-    ports:
-      - '${DB_PORT}:5432'
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-
+      POSTGRES_DB: stitches_stories
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: local_development_only
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stitches_stories"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
   redis:
     image: redis:7.2
-    restart: unless-stopped
-    container_name: redis
-    ports:
-      - '${REDIS_PORT}:6379'
-
+    ports: ["127.0.0.1:6379:6379"]
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports: ["127.0.0.1:1025:1025", "127.0.0.1:8025:8025"]
 volumes:
-  pgdata:
+  postgres_data:

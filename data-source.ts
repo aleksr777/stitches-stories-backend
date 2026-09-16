@@ -1,3 +1,5 @@
+import { shopEntities } from './src/shop/shop.entities';
+import { LegalDocumentEntity, ConsentEvent } from './src/legal/legal.entities';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -20,7 +22,14 @@ const dataSource = new DataSource({
   database: process.env.DB_NAME,
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,
-  entities: [User, AuthSession, SecurityAuditEvent],
+  entities: [
+    User,
+    AuthSession,
+    SecurityAuditEvent,
+    ...shopEntities,
+    LegalDocumentEntity,
+    ConsentEvent,
+  ],
   migrations: ['src/migrations/*.ts'],
   synchronize: false,
   ssl: sslEnabled ? { rejectUnauthorized } : false,

@@ -1,3 +1,7 @@
+import { ShopModule } from './shop/shop.module';
+import { LegalModule } from './legal/legal.module';
+import { shopEntities } from './shop/shop.entities';
+import { LegalDocumentEntity, ConsentEvent } from './legal/legal.entities';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -29,7 +33,14 @@ import { UsersModule } from './users/users.module';
         database: envService.get('DB_NAME'),
         username: envService.get('DB_USERNAME'),
         password: envService.get('DB_PASSWORD'),
-        entities: [User, AuthSession, SecurityAuditEvent],
+        entities: [
+          User,
+          AuthSession,
+          SecurityAuditEvent,
+          ...shopEntities,
+          LegalDocumentEntity,
+          ConsentEvent,
+        ],
         synchronize: envService.get('DB_TYPEORM_SYNC', 'boolean'),
         ssl: securityConfig.getDatabaseSsl()
           ? {
@@ -45,6 +56,8 @@ import { UsersModule } from './users/users.module';
     CoreModule,
     AdminModule,
     HealthModule,
+    LegalModule,
+    ShopModule,
   ],
 })
 export class AppModule {}

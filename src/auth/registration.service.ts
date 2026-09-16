@@ -1,4 +1,6 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { LegalService } from '../legal/legal.service';
+import { RegistrationDetails } from '../legal/legal.types';
+import { HttpException, Injectable, ConflictException } from '@nestjs/common';
 import { Repository, DataSource } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TokensService } from './tokens.service';
@@ -38,6 +40,7 @@ export class RegistrationService {
     private readonly envService: EnvService,
     private readonly redisService: RedisService,
     private readonly nicknameGeneratorService: NicknameGeneratorService,
+    private readonly legal: LegalService,
   ) {
     this.frontendUrl = this.envService.get('FRONTEND_URL');
     this.registrationExpiresIn =
@@ -139,7 +142,15 @@ export class RegistrationService {
     await this.mailService.send(email, 'Confirm registration', text, html);
   }
 
-  async request(email: string, password: string) {
+  async request(
+    email: string,
+    password: string,
+    registration: RegistrationDetails,
+  ) {
+    this.legal.assertReferences(registration.documents, [
+      'pd-account',
+      'account-terms',
+    ]);
     const normalizedEmail = email.trim().toLowerCase();
     this.mailService.validateNotServiceEmail(normalizedEmail);
     await this.assertNotLocked(normalizedEmail);
@@ -162,6 +173,7 @@ export class RegistrationService {
         issuedCode = await this.tokensService.getRegistrationCode({
           email: normalizedEmail,
           password: hashedPassword,
+          registration,
         });
         await this.sendRegistrationCode(normalizedEmail, issuedCode);
         await this.tokensService.clearVerificationFailures(
@@ -248,6 +260,14 @@ export class RegistrationService {
         return await this.rejectInvalidCode(attemptSubject);
       }
 
+      if (!data.registration)
+        throw new ConflictException(
+          'Подтвердите документы и запросите новый код регистрации.',
+        );
+      this.legal.assertReferences(data.registration.documents, [
+        'pd-account',
+        'account-terms',
+      ]);
       this.mailService.validateNotServiceEmail(data.email);
       let nickname: string;
       let attempts = 0;
@@ -265,9 +285,20 @@ export class RegistrationService {
       const newUser = qr.manager.create(User, {
         email: data.email,
         password: data.password,
+        name: data.registration.name,
         nickname,
       });
       await qr.manager.save(User, newUser);
+      await this.legal.record(
+        qr.manager,
+        data.registration.documents,
+        ['pd-account', 'account-terms'],
+        {
+          userId: newUser.id,
+          source: 'registration',
+          verification: 'email-code',
+        },
+      );
       await qr.commitTransaction();
       await this.tokensService.clearVerificationFailures(
         TokenType.REGISTRATION,

@@ -1,3 +1,4 @@
+import { LegalModule } from '../legal/legal.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -26,12 +27,13 @@ import { TokensService } from './tokens.service';
 
 @Module({
   imports: [
+    LegalModule,
     TypeOrmModule.forFeature([User, AuthSession]),
     PassportModule,
     ConfigModule,
     ActivityModule,
     JwtModule.registerAsync({
-      imports: [CoreModule],
+      imports: [LegalModule, CoreModule],
       inject: [EnvService],
       useFactory: (envService: EnvService) => ({
         secret: envService.get('JWT_ACCESS_SECRET'),

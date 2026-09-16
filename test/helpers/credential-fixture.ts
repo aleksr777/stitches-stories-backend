@@ -1,3 +1,5 @@
+import { RegistrationPayload } from '../../src/legal/legal.types';
+import { LegalService } from '../../src/legal/legal.service';
 import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
@@ -109,7 +111,7 @@ export const createCredentialFixture = async (db: DataSource) => {
     consumeRegistrationCode: jest.fn().mockResolvedValue({
       email: `${randomUUID()}@example.com`,
       password: user.password,
-    }),
+    } as RegistrationPayload),
   };
   const tokens = tokenMocks as unknown as TokensService;
   const auth = new AuthService(
@@ -145,6 +147,7 @@ export const createCredentialFixture = async (db: DataSource) => {
     env,
     redis,
     { get: () => randomUUID() } as NicknameGeneratorService,
+    new LegalService(db),
   );
   const email = new EmailChangeService(
     db,

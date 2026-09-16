@@ -1,3 +1,4 @@
+import { RegistrationPayload } from '../legal/legal.types';
 import { randomInt } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { EnvService } from '../common/env-service/env.service';
@@ -56,9 +57,7 @@ export class TokensService {
     );
   }
 
-  private isRegistrationPayload(
-    obj: unknown,
-  ): obj is { email: string; password: string } {
+  private isRegistrationPayload(obj: unknown): obj is RegistrationPayload {
     return (
       typeof obj === 'object' &&
       obj !== null &&
@@ -71,7 +70,7 @@ export class TokensService {
 
   private parseRegistrationPayload(
     raw: string | null,
-  ): { email: string; password: string } | null {
+  ): RegistrationPayload | null {
     if (!raw) return null;
     try {
       const parsed: unknown = JSON.parse(raw);
@@ -251,7 +250,7 @@ export class TokensService {
     }
   }
 
-  async getRegistrationCode(value: { email: string; password: string }) {
+  async getRegistrationCode(value: RegistrationPayload) {
     if (!this.isRegistrationPayload(value)) {
       this.errorsService.default(null, ErrMsg.INVALID_REGISTRATION_PAYLOAD);
     }

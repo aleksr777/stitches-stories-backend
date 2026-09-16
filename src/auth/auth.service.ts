@@ -115,12 +115,14 @@ export class AuthService {
 
   async validateUserById(id: number) {
     try {
-      const user = await this.usersRepository.findOneOrFail({
+      const user = await this.usersRepository.findOne({
         where: { id },
         select: [ID, ROLE, IS_BLOCKED, BLOCKED_REASON],
       });
+      if (!user) this.errorsService.invalidToken(null, TokenType.ACCESS);
       return user;
     } catch (err: unknown) {
+      if (err instanceof HttpException) throw err;
       this.errorsService.userNotFound(err);
       this.errorsService.default(err);
     }

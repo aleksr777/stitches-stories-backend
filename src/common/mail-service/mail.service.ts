@@ -16,10 +16,14 @@ export class MailService {
       host: this.envService.get('SMTP_HOST'),
       port: this.envService.get('SMTP_PORT', 'number'),
       secure: this.envService.get('SMTP_SECURE', 'boolean'),
-      auth: {
-        user: this.envService.get('SMTP_USER'),
-        pass: this.envService.get('SMTP_PASS'),
-      },
+      ...(this.envService.getOptional('SMTP_USER')
+        ? {
+            auth: {
+              user: this.envService.get('SMTP_USER'),
+              pass: this.envService.get('SMTP_PASS'),
+            },
+          }
+        : {}),
     });
   }
 
@@ -30,7 +34,7 @@ export class MailService {
     html?: string,
   ): Promise<void> {
     await this.transporter.sendMail({
-      from: `"Service Email" <${this.smtpFrom}>`,
+      from: `"Stitches & Stories" <${this.smtpFrom}>`,
       to,
       subject,
       text,

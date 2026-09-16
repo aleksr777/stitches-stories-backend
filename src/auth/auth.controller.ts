@@ -210,7 +210,10 @@ export class AuthController {
     await this.publicVerificationRateLimitService.consume(
       this.getRequestIp(req),
     );
-    return this.registrationService.request(dto.email, dto.password);
+    return this.registrationService.request(dto.email, dto.password, {
+      name: dto.name,
+      documents: dto.documents,
+    });
   }
 
   @Post('registration/resend')

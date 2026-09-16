@@ -1,3 +1,10 @@
+import documents from '../src/legal/documents.json';
+const registrationDetails = {
+  name: 'Тестовый пользователь',
+  documents: [documents['pd-account'], documents['account-terms']].map(
+    ({ id, version, sha256 }) => ({ id, version, sha256 }),
+  ),
+};
 import {
   HttpException,
   UnauthorizedException,
@@ -173,13 +180,18 @@ describe('AuthController (e2e)', () => {
 
     const response = await request(getServer())
       .post('/api/auth/registration/request')
-      .send({ email: 'user@example.com', password: 'password1234' })
+      .send({
+        email: 'user@example.com',
+        password: 'password1234',
+        ...registrationDetails,
+      })
       .expect(201);
 
     expect(publicVerificationRateLimitService.consume).toHaveBeenCalledTimes(1);
     expect(registrationService.request).toHaveBeenCalledWith(
       'user@example.com',
       'password1234',
+      registrationDetails,
     );
     expect(response.body as Record<string, unknown>).toMatchObject({
       retry_after: 60,
