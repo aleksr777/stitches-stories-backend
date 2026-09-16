@@ -13,7 +13,7 @@ NestJS + PostgreSQL + Redis. Разработка ведётся в ветке `
 git switch develop
 npm ci
 npm run setup:local
-docker compose up -d
+docker compose up -d --wait
 npm run migration:run
 npm run seed:demo
 npm run start:dev
@@ -22,12 +22,42 @@ npm run start:dev
 `setup:local` создаёт `.env`, если его ещё нет, и генерирует независимые JWT-секреты и случайный пароль владельца. Существующий `.env` не перезаписывается. При обновлении старого `.env` сопоставьте настройки с `.env.example` вручную.
 
 - API: `http://localhost:5174/api`.
-- PostgreSQL: `localhost:5432`, база `stitches_stories`, пользователь `postgres`; пароль для локальной базы задан в compose и `.env.example`.
-- Redis: `localhost:6379`.
-- Mailpit SMTP: `localhost:1025`; просмотр тестовых писем: `http://localhost:8025`.
+- PostgreSQL: `127.0.0.1:15432`, база `stitches_stories`, пользователь `postgres`; пароль для локальной базы берётся из `DB_PASSWORD` в `.env`.
+- Redis: `127.0.0.1:16379`.
+- Mailpit SMTP: `127.0.0.1:11025`; просмотр тестовых писем: `http://127.0.0.1:18025`.
 - Для входа владельца используйте `INITIAL_ADMIN_EMAIL` и `INITIAL_ADMIN_PASSWORD` из локального `.env`. Миграция создаёт владельца; публичная регистрация никогда не назначает роль администратора.
 
 Compose предназначен для локальной разработки: порты привязаны к loopback, тестовые SMTP и пароль базы не подходят для рабочего размещения. Dockerfile собирает API; миграции выполняются отдельно до старта.
+
+### Если порты заняты или `.env` создан предыдущей версией
+
+Публикуемые порты контейнеров и подключения приложения используют одни значения из `.env`: `DB_PORT`, `REDIS_PORT`, `SMTP_PORT`, `MAILPIT_WEB_PORT`. Внутренние порты контейнеров остаются стандартными. Порты по умолчанию отделены от обычных локальных PostgreSQL и Redis; если выбранный порт тоже занят, укажите свободный в `.env`.
+
+После обновления репозитория выполните:
+
+```bash
+git pull --ff-only origin develop
+npm run setup:local -- --repair-ports
+docker compose up -d --wait
+docker compose ps
+npm run migration:run
+npm run seed:demo
+npm run start:dev
+```
+
+Запускайте следующую команду только после успешного завершения предыдущей. `--repair-ports` обновляет стандартные порты старого локального `.env` на указанные выше, заменяет `localhost` на `127.0.0.1` для сервисов и добавляет `MAILPIT_WEB_PORT`. Существующие нестандартные порты, реквизиты БД, JWT-секреты и пароль владельца сохраняются. Скрипт отказывается менять production или конфигурацию с удалёнными сервисами. Остановите работающий API перед изменением его подключений; затем перезапустите его. Контейнеры этого проекта пересоздаются при изменении портов, том `postgres_data` сохраняется.
+
+`Bind ... port is already allocated` означает, что опубликованный порт занят. `password authentication failed` означает, что PostgreSQL доступен, но отклоняет реквизиты: это может быть другая локальная база или сохранённый том с другим паролем. Проверьте адрес своего контейнера:
+
+```bash
+docker compose ps
+docker compose port postgres 5432
+docker compose port redis 6379
+```
+
+При настройках по умолчанию адреса должны быть `127.0.0.1:15432` и `127.0.0.1:16379`. Не выполняйте `docker compose down -v` для устранения ошибки: эта команда удаляет данные. Изменение `DB_PASSWORD` в `.env` не меняет пароль в уже инициализированном томе PostgreSQL. Если адрес правильный, а пароль по-прежнему отклоняется, используйте пароль существующей базы и отдельно разберите её конфигурацию. Не отправляйте содержимое `.env` в чат или GitHub.
+
+Правила подстановки `.env`: [документация Docker Compose](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/).
 
 ## Сценарии магазина
 
@@ -78,6 +108,7 @@ npx eslint "{src,apps,libs,test}/**/*.ts"
 npm run build
 npm test -- --runInBand
 npm run test:e2e -- --runInBand
+npm run test:setup
 ```
 
 Для интеграционных тестов задайте `TEST_DATABASE_URL` на отдельную тестовую PostgreSQL. Тесты создают и удаляют только свои случайные схемы. Без этой переменной PostgreSQL-наборы пропускаются. CI задаёт её и проверяет миграции, транзакции заявок, раздельные согласия и сессии.

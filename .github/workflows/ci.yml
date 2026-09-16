@@ -52,6 +52,8 @@ jobs:
       DB_PASSWORD: postgres
       DB_SSL: false
       DB_SSL_REJECT_UNAUTHORIZED: true
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
       TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/app_test
       INITIAL_ADMIN_EMAIL: admin@example.com
       INITIAL_ADMIN_PASSWORD: ReleaseAuditPassword123!
@@ -72,6 +74,12 @@ jobs:
 
       - name: Audit production dependencies
         run: npm audit --omit=dev
+
+      - name: Local setup regression tests
+        run: npm run test:setup
+
+      - name: Validate Docker Compose configuration
+        run: docker compose --env-file .env.example config --quiet
 
       - name: TypeScript unused-symbol audit
         run: npx tsc --noEmit --noUnusedLocals --noUnusedParameters --pretty false
