@@ -33,6 +33,9 @@ assert(
 const docs = (await request('/legal/documents')).data;
 assert.equal(docs.length, 11);
 assert.equal((await request('/shop/admin/requests')).status, 401);
+assert.equal((await request('/journal/admin/posts')).status, 401);
+assert.equal((await request('/journal/posts')).status, 200);
+assert.deepEqual((await request('/journal/posts')).data.items, []);
 assert.equal(
   (
     await request('/auth/registration/request', {
@@ -76,6 +79,11 @@ const admin = await request(
   login.data.access_token,
 );
 assert.equal(admin.status, 200);
+assert.equal(
+  (await request('/journal/admin/config', undefined, login.data.access_token))
+    .status,
+  200,
+);
 assert(admin.data.some((r) => r.id === first.data.id));
 console.log(
   'Application readiness, catalog, consent validation, price checks, request idempotency and administrator access passed.',
