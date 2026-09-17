@@ -1,5 +1,4 @@
 import { shopEntities } from './src/shop/shop.entities';
-import { journalEntities } from './src/journal/journal.entities';
 import { LegalDocumentEntity, ConsentEvent } from './src/legal/legal.entities';
 import * as dotenv from 'dotenv';
 dotenv.config();
@@ -28,7 +27,6 @@ const dataSource = new DataSource({
     AuthSession,
     SecurityAuditEvent,
     ...shopEntities,
-    ...journalEntities,
     LegalDocumentEntity,
     ConsentEvent,
   ],

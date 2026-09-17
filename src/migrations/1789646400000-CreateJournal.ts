@@ -1,4 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+// Historical migration: the VK journal feature was removed. Keep this class so
+// installations that already applied it retain a complete migration history.
+// The application no longer maps or exposes these tables; their data is retained.
 export class CreateJournal1789646400000 implements MigrationInterface {
   async up(q: QueryRunner): Promise<void> {
     await q.query(

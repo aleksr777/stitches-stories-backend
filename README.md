@@ -5,8 +5,6 @@ NestJS + PostgreSQL + Redis. Разработка ведётся в ветке `
 Фронтенд: [stitches-stories-frontend](https://github.com/aleksr777/stitches-stories-frontend/tree/develop).
 Основа — `aleksr777/nestjs-routing-authorization`; происхождение зафиксировано в [SOURCE-TEMPLATE.md](SOURCE-TEMPLATE.md).
 
-Журнал мастерской: [подключение VK и одобрение публикаций](docs/VK-JOURNAL.md). Импорт доступен администратору; на сайт попадают только явно одобренные посты.
-
 ## Запуск для разработки
 
 Нужны Node.js 22+ и Docker Compose.

@@ -1,6 +1,4 @@
 import { ShopModule } from './shop/shop.module';
-import { JournalModule } from './journal/journal.module';
-import { journalEntities } from './journal/journal.entities';
 import { LegalModule } from './legal/legal.module';
 import { shopEntities } from './shop/shop.entities';
 import { LegalDocumentEntity, ConsentEvent } from './legal/legal.entities';
@@ -40,7 +38,6 @@ import { UsersModule } from './users/users.module';
           AuthSession,
           SecurityAuditEvent,
           ...shopEntities,
-          ...journalEntities,
           LegalDocumentEntity,
           ConsentEvent,
         ],
@@ -61,7 +58,6 @@ import { UsersModule } from './users/users.module';
     HealthModule,
     LegalModule,
     ShopModule,
-    JournalModule,
   ],
 })
 export class AppModule {}
