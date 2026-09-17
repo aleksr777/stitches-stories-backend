@@ -2,6 +2,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsDefined,
@@ -57,7 +58,11 @@ export class ProductDto {
   @IsString() @Length(2, 160) productionTime!: string;
   @IsArray()
   @ArrayMaxSize(8)
-  @Matches(/^\/images\/[a-zA-Z0-9_-]+\.(webp|png|jpg|jpeg)$/, { each: true })
+  @ArrayUnique()
+  @Matches(
+    /^(?:\/images\/[a-zA-Z0-9_-]+\.(?:webp|png|jpg|jpeg)|\/shop\/images\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|upload:[0-7])$/,
+    { each: true, message: 'Некорректная ссылка на фотографию изделия.' },
+  )
   images!: string[];
   @IsInt() @Min(0) @Max(10000) stock!: number;
   @IsBoolean() featured!: boolean;

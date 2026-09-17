@@ -4,10 +4,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, QueryFailedError } from 'typeorm';
+import { DataSource, QueryFailedError, In } from 'typeorm';
+import { randomUUID } from 'node:crypto';
 import { LegalService, canonical, digest } from '../legal/legal.service';
 import { CreateRequestDto, ProductDto } from './shop.dto';
-import { Favorite, OrderRequest, Product } from './shop.entities';
+import { Favorite, OrderRequest, Product, ProductImage } from './shop.entities';
+import {
+  MAX_PRODUCT_IMAGES,
+  ProductImageUpload,
+  VerifiedProductImage,
+  verifyProductImage,
+} from './product-upload';
 @Injectable()
 export class ShopService {
   constructor(
@@ -162,11 +169,95 @@ export class ShopService {
     if (!result.affected) throw new NotFoundException();
     return { updated: true };
   }
-  async saveProduct(dto: ProductDto, id?: string) {
-    const repo = this.db.getRepository(Product);
-    if (id && !(await repo.existsBy({ id }))) throw new NotFoundException();
+  async image(id: string, admin = false) {
+    const query = this.db
+      .getRepository(ProductImage)
+      .createQueryBuilder('image')
+      .innerJoin('image.product', 'product')
+      .addSelect('image.data')
+      .where('image.id = :id', { id });
+    if (!admin) {
+      query.andWhere('product.active = true');
+      if (process.env.NODE_ENV === 'production')
+        query.andWhere('product.isDemo = false');
+    }
+    const image = await query.getOne();
+    if (!image) throw new NotFoundException('Фотография не найдена.');
+    return image;
+  }
+
+  async saveProduct(
+    dto: ProductDto,
+    id?: string,
+    files: ProductImageUpload[] = [],
+  ) {
+    if (
+      files.length > MAX_PRODUCT_IMAGES ||
+      dto.images.length > MAX_PRODUCT_IMAGES
+    )
+      throw new BadRequestException(
+        'Для изделия можно сохранить до 8 фотографий.',
+      );
+    const uploadRefs = dto.images.filter((path) => path.startsWith('upload:'));
+    if (
+      new Set(dto.images).size !== dto.images.length ||
+      uploadRefs.length !== files.length ||
+      files.some((_, i) => !uploadRefs.includes('upload:' + i))
+    )
+      throw new BadRequestException(
+        'Список фотографий не соответствует загруженным файлам.',
+      );
+    const uploaded: Array<VerifiedProductImage & { id: string }> = [];
+    for (const file of files)
+      uploaded.push({ id: randomUUID(), ...(await verifyProductImage(file)) });
     try {
-      return await repo.save(repo.create({ ...dto, ...(id ? { id } : {}) }));
+      return await this.db.transaction(async (m) => {
+        const repo = m.getRepository(Product);
+        const existing = id
+          ? await repo.findOne({
+              where: { id },
+              lock: { mode: 'pessimistic_write' },
+            })
+          : null;
+        if (id && !existing) throw new NotFoundException('Изделие не найдено.');
+        const imageRepo = m.getRepository(ProductImage);
+        const currentImages = id
+          ? await imageRepo.findBy({ productId: id })
+          : [];
+        const keptPaths = dto.images.filter((path) =>
+          path.startsWith('/shop/images/'),
+        );
+        if (
+          keptPaths.some(
+            (path) =>
+              !currentImages.some(
+                (image) => path === '/shop/images/' + image.id,
+              ),
+          )
+        )
+          throw new BadRequestException(
+            'Фотография не принадлежит этому изделию или уже удалена. Обновите карточку.',
+          );
+        const images = dto.images.map((path) =>
+          path.startsWith('upload:')
+            ? '/shop/images/' + uploaded[Number(path.slice(7))].id
+            : path,
+        );
+        const productId = id ?? randomUUID();
+        const saved = await repo.save(
+          repo.create({ ...dto, id: productId, images }),
+        );
+        if (uploaded.length)
+          await imageRepo.insert(
+            uploaded.map((image) => ({ ...image, productId })),
+          );
+        const removed = currentImages
+          .filter((image) => !keptPaths.includes('/shop/images/' + image.id))
+          .map((image) => image.id);
+        if (removed.length)
+          await imageRepo.delete({ id: In(removed), productId });
+        return saved;
+      });
     } catch (e) {
       if (
         e instanceof QueryFailedError &&

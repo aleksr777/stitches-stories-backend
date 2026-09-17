@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import sharp from 'sharp';
 const base = process.env.SHOP_API_URL ?? 'http://127.0.0.1:5174/api';
 let ready = false;
 for (let attempt = 0; attempt < 60; attempt++) {
@@ -79,6 +80,81 @@ const admin = await request(
 );
 assert.equal(admin.status, 200);
 assert(admin.data.some((r) => r.id === first.data.id));
+const photoBytes = await sharp({
+  create: { width: 3, height: 4, channels: 3, background: '#d9b7b1' },
+})
+  .png()
+  .toBuffer();
+const photoProduct = {
+  slug: 'smoke-photo-' + randomUUID(),
+  name: 'Тестовая фотография',
+  category: 'covers',
+  priceRub: 1000,
+  description: 'Изделие для проверки загрузки фотографии',
+  materials: 'Хлопок',
+  dimensions: '10 × 15 см',
+  productionTime: 'По согласованию',
+  images: ['upload:0'],
+  stock: 1,
+  featured: false,
+  active: true,
+  isDemo: true,
+};
+const savePhotoProduct = async (data, id) => {
+  const form = new FormData();
+  form.append('data', JSON.stringify(data));
+  if (!id)
+    form.append(
+      'files',
+      new Blob([photoBytes], { type: 'image/png' }),
+      'test.png',
+    );
+  const result = await fetch(
+    base + '/shop/admin/products' + (id ? '/' + id : ''),
+    {
+      method: id ? 'PATCH' : 'POST',
+      headers: { Authorization: 'Bearer ' + login.data.access_token },
+      body: form,
+    },
+  );
+  assert.equal(result.status, id ? 200 : 201);
+  return result.json();
+};
+const withPhoto = await savePhotoProduct(photoProduct);
+assert.match(withPhoto.images[0], /^\/shop\/images\/[0-9a-f-]+$/);
+const photoResponse = await fetch(base + withPhoto.images[0]);
+assert.equal(photoResponse.status, 200);
+assert.equal(photoResponse.headers.get('content-type'), 'image/png');
+assert.deepEqual(Buffer.from(await photoResponse.arrayBuffer()), photoBytes);
+const reloaded = await request('/shop/products/' + photoProduct.slug);
+assert.deepEqual(reloaded.data.images, withPhoto.images);
+await savePhotoProduct(
+  { ...photoProduct, active: false, images: withPhoto.images },
+  withPhoto.id,
+);
+assert.equal((await fetch(base + withPhoto.images[0])).status, 404);
+const privatePath = withPhoto.images[0].replace('/images/', '/admin/images/');
+assert.equal((await fetch(base + privatePath)).status, 401);
+assert.equal(
+  (
+    await fetch(base + privatePath, {
+      headers: { Authorization: 'Bearer ' + login.data.access_token },
+    })
+  ).status,
+  200,
+);
+await savePhotoProduct(
+  { ...photoProduct, active: false, images: [] },
+  withPhoto.id,
+);
+assert.equal(
+  (
+    await fetch(base + privatePath, {
+      headers: { Authorization: 'Bearer ' + login.data.access_token },
+    })
+  ).status,
+  404,
+);
 console.log(
-  'Application readiness, catalog, consent validation, price checks, request idempotency and administrator access passed.',
+  'Application readiness, catalog, consent validation, price checks, request idempotency, administrator access and product image upload/read/edit passed.',
 );

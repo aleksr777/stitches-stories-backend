@@ -6,6 +6,8 @@ import {
   Index,
   CreateDateColumn,
   UpdateDateColumn,
+  JoinColumn,
+  ManyToOne,
 } from 'typeorm';
 import { DocumentRef } from '../legal/legal.types';
 @Entity('product')
@@ -25,6 +27,22 @@ export class Product {
   @Column({ type: 'boolean', default: true }) active!: boolean;
   @Column({ type: 'boolean', default: true }) isDemo!: boolean;
   @UpdateDateColumn({ type: 'timestamptz' }) updatedAt!: Date;
+}
+@Entity('product_image')
+@Index(['productId'])
+export class ProductImage {
+  @PrimaryGeneratedColumn('uuid') id!: string;
+  @Column({ type: 'uuid' }) productId!: string;
+  @ManyToOne(() => Product, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'productId' })
+  product!: Product;
+  @Column({ type: 'bytea', select: false }) data!: Buffer;
+  @Column({ type: 'varchar', length: 32 }) mime!: string;
+  @Column({ type: 'varchar', length: 64 }) sha256!: string;
+  @Column({ type: 'integer' }) width!: number;
+  @Column({ type: 'integer' }) height!: number;
+  @Column({ type: 'integer' }) byteLength!: number;
+  @CreateDateColumn({ type: 'timestamptz' }) createdAt!: Date;
 }
 export type OrderLine = {
   productId: string;
@@ -76,4 +94,10 @@ export class Subscription {
   @Column({ type: 'jsonb' }) documents!: DocumentRef[];
   @UpdateDateColumn({ type: 'timestamptz' }) updatedAt!: Date;
 }
-export const shopEntities = [Product, OrderRequest, Favorite, Subscription];
+export const shopEntities = [
+  Product,
+  ProductImage,
+  OrderRequest,
+  Favorite,
+  Subscription,
+];
