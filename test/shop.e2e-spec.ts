@@ -138,8 +138,9 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
     expect(await shop.requests(fixture.user.id + 10000)).toHaveLength(0);
   });
   it('rejects customer actions for the shop owner', async () => {
+    const data = requestData();
     await expect(
-      shop.createRequest(requestData(), fixture.user.id, Role.ADMIN),
+      shop.createRequest(data, fixture.user.id, Role.ADMIN),
     ).rejects.toBeInstanceOf(ForbiddenException);
     await expect(
       shop.favorite(fixture.user.id, product.id, true, Role.ADMIN),
@@ -147,7 +148,11 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
     await expect(
       shop.favorite(fixture.user.id, product.id, false, Role.ADMIN),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(await db.getRepository(OrderRequest).count()).toBe(0);
+    expect(
+      await db
+        .getRepository(OrderRequest)
+        .countBy({ requestKey: data.requestKey }),
+    ).toBe(0);
     expect(await shop.favorites(fixture.user.id)).toEqual([]);
   });
   it('creates the account and two consent records in the same registration transaction', async () => {
