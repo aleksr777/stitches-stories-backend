@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
@@ -22,6 +23,7 @@ import { AuthSession } from '../src/auth/entities/auth-session.entity';
 import { EnvService } from '../src/common/env-service/env.service';
 import { MailService } from '../src/common/mail-service/mail.service';
 import { CODE, createCredentialFixture } from './helpers/credential-fixture';
+import { Role } from '../src/common/types/role.enum';
 
 const url = process.env.TEST_DATABASE_URL;
 const databaseTests = url ? describe : describe.skip;
@@ -134,6 +136,19 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
     await shop.createRequest(requestData(), null);
     expect(await shop.requests(fixture.user.id)).toHaveLength(1);
     expect(await shop.requests(fixture.user.id + 10000)).toHaveLength(0);
+  });
+  it('rejects customer actions for the shop owner', async () => {
+    await expect(
+      shop.createRequest(requestData(), fixture.user.id, Role.ADMIN),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      shop.favorite(fixture.user.id, product.id, true, Role.ADMIN),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      shop.favorite(fixture.user.id, product.id, false, Role.ADMIN),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(await db.getRepository(OrderRequest).count()).toBe(0);
+    expect(await shop.favorites(fixture.user.id)).toEqual([]);
   });
   it('creates the account and two consent records in the same registration transaction', async () => {
     const email = randomUUID() + '@example.test';

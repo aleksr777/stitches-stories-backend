@@ -81,10 +81,8 @@ export class ShopController {
     @Body() dto: CreateRequestDto,
     @Req() req: Request,
   ) {
-    return this.shop.createRequest(
-      dto,
-      (req.user as User | undefined)?.id ?? null,
-    );
+    const user = req.user as User | undefined;
+    return this.shop.createRequest(dto, user?.id ?? null, user?.role);
   }
   @Get('me/requests') @UseGuards(JwtAuthGuard) requests(@Req() req: Request) {
     return this.shop.requests((req.user as User).id);
@@ -96,13 +94,15 @@ export class ShopController {
     @Req() req: Request,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.shop.favorite((req.user as User).id, id, true);
+    const user = req.user as User;
+    return this.shop.favorite(user.id, id, true, user.role);
   }
   @Delete('me/favorites/:id') @UseGuards(JwtAuthGuard) unfavorite(
     @Req() req: Request,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.shop.favorite((req.user as User).id, id, false);
+    const user = req.user as User;
+    return this.shop.favorite(user.id, id, false, user.role);
   }
   @Post('newsletter/request') @UseGuards(ShopWriteGuard) subscribe(
     @Body() dto: NewsletterDto,

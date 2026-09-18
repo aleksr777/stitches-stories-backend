@@ -1,12 +1,14 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, QueryFailedError, In } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { LegalService, canonical, digest } from '../legal/legal.service';
+import { Role } from '../common/types/role.enum';
 import { CreateRequestDto, ProductDto } from './shop.dto';
 import { Favorite, OrderRequest, Product, ProductImage } from './shop.entities';
 import {
@@ -66,7 +68,15 @@ export class ShopService {
       createdAt: order.createdAt,
     };
   }
-  async createRequest(dto: CreateRequestDto, userId: number | null) {
+  async createRequest(
+    dto: CreateRequestDto,
+    userId: number | null,
+    role?: Role,
+  ) {
+    if (role === Role.ADMIN)
+      throw new ForbiddenException(
+        'Владелец магазина не может отправлять заявки на покупку.',
+      );
     this.legal.assertReferences([dto.document], ['offer']);
     if (new Set(dto.items.map((i) => i.productId)).size !== dto.items.length)
       throw new BadRequestException('В запросе повторяются изделия.');
@@ -161,7 +171,16 @@ export class ShopService {
       (f) => f.productId,
     );
   }
-  async favorite(userId: number, productId: string, enabled: boolean) {
+  async favorite(
+    userId: number,
+    productId: string,
+    enabled: boolean,
+    role?: Role,
+  ) {
+    if (role === Role.ADMIN)
+      throw new ForbiddenException(
+        'Владелец магазина не может изменять избранное.',
+      );
     if (enabled) {
       const p = await this.db
         .getRepository(Product)
