@@ -154,6 +154,9 @@ export class ShopAdminController {
   ) {
     return this.shop.saveProduct(await parseProductPayload(body), id, files);
   }
+  @Delete('products/:id') remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.shop.removeProduct(id);
+  }
   @Get('images/:id') async image(
     @Param('id', ParseUUIDPipe) id: string,
     @Res() response: Response,

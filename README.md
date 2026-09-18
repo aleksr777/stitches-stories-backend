@@ -88,23 +88,23 @@ docker compose port redis 6379
 
 ## Основные маршруты
 
-| Метод              | Путь после `/api`                                            | Доступ                                   |
-| ------------------ | ------------------------------------------------------------ | ---------------------------------------- |
-| GET                | `/shop/products`, `/shop/products/:slug`                     | Открытый каталог                         |
-| GET                | `/legal/documents`, `/legal/documents/:id/versions/:version` | Текущие и архивные документы             |
-| POST               | `/auth/registration/request`                                 | `email`, `password`, `name`, `documents` |
-| POST               | `/auth/registration/confirm`                                 | `email`, `code`                          |
-| POST               | `/shop/requests`                                             | Гость либо Bearer-токен                  |
-| GET                | `/shop/me/requests`, `/shop/me/favorites`                    | Свой аккаунт                             |
-| POST / DELETE      | `/shop/me/favorites/:id`                                     | Свой аккаунт                             |
-| GET                | `/shop/me/consents`, `/legal/me/events`                      | Свои согласия                            |
-| POST               | `/shop/me/consents/withdraw`                                 | `purpose`: `account` или `marketing`     |
-| POST               | `/shop/newsletter/request`                                   | `email`, две ссылки на документы         |
-| POST               | `/shop/newsletter/confirm`, `/shop/newsletter/unsubscribe`   | Одноразовый/отписной `token`             |
-| GET / POST / PATCH | `/shop/admin/products`, `/shop/admin/products/:id`           | Только admin                             |
-| GET                | `/shop/images/:id`                                         | Фотографии опубликованных изделий        |
-| GET                | `/shop/admin/images/:id`                                   | Только admin, включая скрытые изделия     |
-| GET / PATCH        | `/shop/admin/requests`, `/shop/admin/requests/:id`           | Только admin                             |
+| Метод                       | Путь после `/api`                                            | Доступ                                   |
+| --------------------------- | ------------------------------------------------------------ | ---------------------------------------- |
+| GET                         | `/shop/products`, `/shop/products/:slug`                     | Открытый каталог                         |
+| GET                         | `/legal/documents`, `/legal/documents/:id/versions/:version` | Текущие и архивные документы             |
+| POST                        | `/auth/registration/request`                                 | `email`, `password`, `name`, `documents` |
+| POST                        | `/auth/registration/confirm`                                 | `email`, `code`                          |
+| POST                        | `/shop/requests`                                             | Гость либо Bearer-токен                  |
+| GET                         | `/shop/me/requests`, `/shop/me/favorites`                    | Свой аккаунт                             |
+| POST / DELETE               | `/shop/me/favorites/:id`                                     | Свой аккаунт                             |
+| GET                         | `/shop/me/consents`, `/legal/me/events`                      | Свои согласия                            |
+| POST                        | `/shop/me/consents/withdraw`                                 | `purpose`: `account` или `marketing`     |
+| POST                        | `/shop/newsletter/request`                                   | `email`, две ссылки на документы         |
+| POST                        | `/shop/newsletter/confirm`, `/shop/newsletter/unsubscribe`   | Одноразовый/отписной `token`             |
+| GET / POST / PATCH / DELETE | `/shop/admin/products`, `/shop/admin/products/:id`           | Только admin                             |
+| GET                         | `/shop/images/:id`                                           | Фотографии опубликованных изделий        |
+| GET                         | `/shop/admin/images/:id`                                     | Только admin, включая скрытые изделия    |
+| GET / PATCH                 | `/shop/admin/requests`, `/shop/admin/requests/:id`           | Только admin                             |
 
 Ссылка на документ — `{ id, version, sha256 }` из `/legal/documents`. Для регистрации нужны `pd-account` и `account-terms`; для рассылки — `pd-marketing` и `ads-email`; для заявки — `offer`. Устаревшие версии отвергаются.
 
@@ -116,7 +116,7 @@ docker compose port redis 6379
 
 `POST /shop/admin/products` и `PATCH /shop/admin/products/:id` принимают `multipart/form-data`: поле `data` содержит JSON карточки, повторяемое поле `files` — файлы. В `data.images` укажите `upload:0`, `upload:1` и т. д. в порядке файлов либо сохранённые `/shop/images/<uuid>` этого изделия. Порядок массива определяет основное фото. Обычный JSON без новых файлов также поддерживается, как и прежние пути `/images/имя.jpg`.
 
-Изделие, новые изображения и удаление убранных фотографий сохраняются в одной транзакции. При ошибке данные остаются прежними; закрытие формы до сохранения ничего не загружает. Каталог возвращает только пути, сами изображения загружаются отдельными запросами из API. Публичная выдача проверяет видимость изделия при каждом запросе (в production также исключает демо); для предпросмотра скрытых изделий администратор использует защищённый маршрут. Загрузка и редактирование требуют роли admin. Если перед API установлен reverse proxy, его лимит тела запроса должен допускать суммарный multipart до 65 МБ; ограничения каждого файла проверяет приложение.
+Изделие, новые изображения и удаление убранных фотографий сохраняются в одной транзакции. При ошибке данные остаются прежними; закрытие формы до сохранения ничего не загружает. `DELETE /shop/admin/products/:id` удаляет само изделие, его фотографии и записи избранного; уже отправленные заявки сохраняют свой снимок изделия и не меняются. Каталог возвращает только пути, сами изображения загружаются отдельными запросами из API. Публичная выдача проверяет видимость изделия при каждом запросе (в production также исключает демо); для предпросмотра скрытых изделий администратор использует защищённый маршрут. Загрузка, редактирование и удаление требуют роли admin. Если перед API установлен reverse proxy, его лимит тела запроса должен допускать суммарный multipart до 65 МБ; ограничения каждого файла проверяет приложение.
 
 ## Документы и готовность к запуску
 

@@ -6,7 +6,13 @@ import {
 import { randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
 import sharp from 'sharp';
-import { Product, ProductImage, shopEntities } from '../src/shop/shop.entities';
+import {
+  Favorite,
+  OrderRequest,
+  Product,
+  ProductImage,
+  shopEntities,
+} from '../src/shop/shop.entities';
 import { ShopService } from '../src/shop/shop.service';
 import { ProductDto } from '../src/shop/shop.dto';
 import { LegalService } from '../src/legal/legal.service';
@@ -51,6 +57,12 @@ const url = process.env.TEST_DATABASE_URL;
       .toBuffer();
   });
   beforeEach(async () => {
+    await db
+      .getRepository(OrderRequest)
+      .createQueryBuilder()
+      .delete()
+      .execute();
+    await db.getRepository(Favorite).createQueryBuilder().delete().execute();
     await db.getRepository(Product).createQueryBuilder().delete().execute();
   });
   afterAll(async () => {
@@ -123,6 +135,53 @@ const url = process.env.TEST_DATABASE_URL;
       saved.id,
     );
     expect((await shop.image(id)).data).toEqual(buffer);
+  });
+  it('deletes product photos and favorites but keeps request snapshots intact', async () => {
+    const saved = await shop.saveProduct(dto(), undefined, [{ buffer }]);
+    const imageId = saved.images[0].split('/').pop()!;
+    await db.getRepository(Favorite).save({ userId: 7, productId: saved.id });
+    const request = await db.getRepository(OrderRequest).save({
+      requestKey: randomUUID(),
+      payloadHash: 'a'.repeat(64),
+      userId: null,
+      name: 'Тестовая заявка',
+      email: 'buyer@example.test',
+      phone: null,
+      city: 'Москва',
+      comment: '',
+      items: [
+        {
+          productId: saved.id,
+          slug: saved.slug,
+          name: saved.name,
+          quantity: 1,
+          priceRub: saved.priceRub,
+        },
+      ],
+      subtotalRub: saved.priceRub,
+      document: { id: 'offer', version: 'draft-v1', sha256: 'a'.repeat(64) },
+    });
+
+    await expect(shop.removeProduct(saved.id)).resolves.toEqual({
+      deleted: true,
+    });
+
+    expect(await db.getRepository(Product).existsBy({ id: saved.id })).toBe(
+      false,
+    );
+    expect(await db.getRepository(ProductImage).count()).toBe(0);
+    expect(
+      await db.getRepository(Favorite).countBy({ productId: saved.id }),
+    ).toBe(0);
+    expect(
+      await db.getRepository(OrderRequest).countBy({ id: request.id }),
+    ).toBe(1);
+    await expect(shop.image(imageId, true)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(shop.removeProduct(saved.id)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
   it('refuses references to another product and unmatched uploads', async () => {
     const saved = await shop.saveProduct(dto(), undefined, [{ buffer }]);

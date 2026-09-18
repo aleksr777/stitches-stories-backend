@@ -41,6 +41,22 @@ export class ShopService {
       throw new NotFoundException('Изделие не найдено.');
     return p;
   }
+  async removeProduct(id: string) {
+    return this.db.transaction(async (manager) => {
+      const products = manager.getRepository(Product);
+      const product = await products.findOne({
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!product) throw new NotFoundException('Изделие не найдено.');
+
+      // Заявки содержат снимок изделия на момент отправки и должны остаться
+      // доступными владельцу. Избранное таких снимков не имеет — удаляем его.
+      await manager.getRepository(Favorite).delete({ productId: id });
+      await products.remove(product);
+      return { deleted: true };
+    });
+  }
   private receipt(order: OrderRequest) {
     return {
       id: order.id,

@@ -143,9 +143,24 @@ assert.equal(
   ).status,
   200,
 );
-await savePhotoProduct(
-  { ...photoProduct, active: false, images: [] },
-  withPhoto.id,
+const deleted = await fetch(base + '/shop/admin/products/' + withPhoto.id, {
+  method: 'DELETE',
+  headers: { Authorization: 'Bearer ' + login.data.access_token },
+});
+assert.equal(deleted.status, 200);
+assert.deepEqual(await deleted.json(), { deleted: true });
+const productsAfterDeletion = await request(
+  '/shop/admin/products',
+  undefined,
+  login.data.access_token,
+);
+assert.equal(
+  productsAfterDeletion.data.some((product) => product.id === withPhoto.id),
+  false,
+);
+assert.equal(
+  (await request('/shop/products/' + photoProduct.slug)).status,
+  404,
 );
 assert.equal(
   (
@@ -156,5 +171,5 @@ assert.equal(
   404,
 );
 console.log(
-  'Application readiness, catalog, consent validation, price checks, request idempotency, administrator access and product image upload/read/edit passed.',
+  'Application readiness, catalog, consent validation, price checks, request idempotency, administrator access and product image upload/read/edit/delete passed.',
 );

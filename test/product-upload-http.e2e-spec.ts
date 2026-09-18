@@ -40,7 +40,11 @@ describe('Product photo HTTP boundary', () => {
     active: false,
     isDemo: false,
   };
-  const shop = { saveProduct: jest.fn(), image: jest.fn() };
+  const shop = {
+    saveProduct: jest.fn(),
+    removeProduct: jest.fn(),
+    image: jest.fn(),
+  };
   beforeAll(async () => {
     png = await sharp({
       create: { width: 3, height: 4, channels: 3, background: 'white' },
@@ -91,6 +95,7 @@ describe('Product photo HTTP boundary', () => {
     shop.saveProduct
       .mockReset()
       .mockResolvedValue({ ...product, id, images: ['/shop/images/' + id] });
+    shop.removeProduct.mockReset().mockResolvedValue({ deleted: true });
     shop.image.mockReset().mockResolvedValue({
       id,
       data: png,
@@ -146,9 +151,22 @@ describe('Product photo HTTP boundary', () => {
         .get('/api/shop/admin/images/' + id)
         .set('Authorization', token)
         .expect(status);
+      await request(app.getHttpServer() as Server)
+        .delete('/api/shop/admin/products/' + id)
+        .set('Authorization', token)
+        .expect(status);
     }
     expect(shop.saveProduct).not.toHaveBeenCalled();
+    expect(shop.removeProduct).not.toHaveBeenCalled();
     expect(shop.image).not.toHaveBeenCalled();
+  });
+  it('lets only the administrator delete a product', async () => {
+    await request(app.getHttpServer() as Server)
+      .delete('/api/shop/admin/products/' + id)
+      .set('Authorization', 'Bearer administrator')
+      .expect(200)
+      .expect({ deleted: true });
+    expect(shop.removeProduct).toHaveBeenCalledWith(id);
   });
   it('rejects excessive uploads and invalid metadata without calling persistence', async () => {
     await request(app.getHttpServer() as Server)
