@@ -3,6 +3,88 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 const base = process.env.SHOP_API_URL ?? 'http://127.0.0.1:5174/api';
+const localMailpitHosts = new Set(['127.0.0.1', 'localhost', '::1']);
+const mailpitBase =
+  process.env.SMOKE_MAILPIT_URL ??
+  `http://127.0.0.1:${process.env.MAILPIT_WEB_PORT ?? '18025'}`;
+
+function isLocalMailpit() {
+  return (
+    localMailpitHosts.has(process.env.SMTP_HOST ?? '') &&
+    !['true', '1'].includes((process.env.SMTP_SECURE ?? '').toLowerCase()) &&
+    !process.env.SMTP_USER &&
+    !process.env.SMTP_PASS
+  );
+}
+
+function messageHasRecipient(message, email) {
+  return JSON.stringify(message?.To ?? message?.to ?? '')
+    .toLowerCase()
+    .includes(email.toLowerCase());
+}
+
+function extractConfirmationCode(message) {
+  const text = [
+    message?.Text,
+    message?.HTML,
+    message?.text,
+    message?.html,
+    message?.Snippet,
+    message?.snippet,
+  ]
+    .filter((value) => typeof value === 'string')
+    .join('\n');
+  return text.match(/\b\d{6}\b/)?.[0] ?? null;
+}
+
+async function readAdminConfirmationCode(email) {
+  assert(
+    isLocalMailpit(),
+    'Smoke-проверка входа владельца требует локальный Mailpit. Не используйте её с внешним SMTP.',
+  );
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`${mailpitBase}/api/v1/messages?limit=100`);
+      if (response.ok) {
+        const payload = await response.json();
+        const messages = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload.messages)
+            ? payload.messages
+            : [];
+        for (const message of messages) {
+          if (
+            !messageHasRecipient(message, email) ||
+            !String(message.Subject ?? message.subject ?? '').includes(
+              'Подтвердите вход владельца',
+            )
+          )
+            continue;
+          const code = extractConfirmationCode(message);
+          if (code) return code;
+          const id = message.ID ?? message.id;
+          if (!id) continue;
+          const detailResponse = await fetch(
+            `${mailpitBase}/api/v1/message/${encodeURIComponent(id)}`,
+          );
+          if (!detailResponse.ok) continue;
+          const detailCode = extractConfirmationCode(
+            await detailResponse.json(),
+          );
+          if (detailCode) return detailCode;
+        }
+      }
+    } catch {
+      // Mailpit can become available shortly after the application does.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  assert.fail(
+    'Код подтверждения входа владельца не поступил в локальный Mailpit.',
+  );
+}
+
 let ready = false;
 for (let attempt = 0; attempt < 60; attempt++) {
   try {
@@ -73,10 +155,20 @@ const login = await request('/auth/login', {
   password: process.env.INITIAL_ADMIN_PASSWORD,
 });
 assert.equal(login.status, 201);
+assert.equal(login.data.admin_confirmation_required, true);
+const adminConfirmationCode = await readAdminConfirmationCode(
+  process.env.INITIAL_ADMIN_EMAIL,
+);
+const confirmedLogin = await request('/auth/login/admin/confirm', {
+  challenge_id: login.data.challenge_id,
+  code: adminConfirmationCode,
+});
+assert.equal(confirmedLogin.status, 201);
+assert.equal(typeof confirmedLogin.data.access_token, 'string');
 const admin = await request(
   '/shop/admin/requests',
   undefined,
-  login.data.access_token,
+  confirmedLogin.data.access_token,
 );
 assert.equal(admin.status, 200);
 assert(admin.data.some((r) => r.id === first.data.id));
@@ -113,7 +205,7 @@ const savePhotoProduct = async (data, id) => {
     base + '/shop/admin/products' + (id ? '/' + id : ''),
     {
       method: id ? 'PATCH' : 'POST',
-      headers: { Authorization: 'Bearer ' + login.data.access_token },
+      headers: { Authorization: 'Bearer ' + confirmedLogin.data.access_token },
       body: form,
     },
   );
@@ -138,21 +230,21 @@ assert.equal((await fetch(base + privatePath)).status, 401);
 assert.equal(
   (
     await fetch(base + privatePath, {
-      headers: { Authorization: 'Bearer ' + login.data.access_token },
+      headers: { Authorization: 'Bearer ' + confirmedLogin.data.access_token },
     })
   ).status,
   200,
 );
 const deleted = await fetch(base + '/shop/admin/products/' + withPhoto.id, {
   method: 'DELETE',
-  headers: { Authorization: 'Bearer ' + login.data.access_token },
+  headers: { Authorization: 'Bearer ' + confirmedLogin.data.access_token },
 });
 assert.equal(deleted.status, 200);
 assert.deepEqual(await deleted.json(), { deleted: true });
 const productsAfterDeletion = await request(
   '/shop/admin/products',
   undefined,
-  login.data.access_token,
+  confirmedLogin.data.access_token,
 );
 assert.equal(
   productsAfterDeletion.data.some((product) => product.id === withPhoto.id),
@@ -165,7 +257,7 @@ assert.equal(
 assert.equal(
   (
     await fetch(base + privatePath, {
-      headers: { Authorization: 'Bearer ' + login.data.access_token },
+      headers: { Authorization: 'Bearer ' + confirmedLogin.data.access_token },
     })
   ).status,
   404,

@@ -89,24 +89,24 @@ docker compose port redis 6379
 
 ## Основные маршруты
 
-| Метод                       | Путь после `/api`                                            | Доступ                                   |
-| --------------------------- | ------------------------------------------------------------ | ---------------------------------------- |
-| GET                         | `/shop/products`, `/shop/products/:slug`                     | Открытый каталог                         |
-| GET                         | `/legal/documents`, `/legal/documents/:id/versions/:version` | Текущие и архивные документы             |
-| POST                        | `/auth/registration/request`                                 | `email`, `password`, `name`, `documents` |
-| POST                        | `/auth/registration/confirm`                                 | `email`, `code`                          |
-| POST                        | `/auth/login/admin/confirm`, `/auth/login/admin/resend`       | Подтверждение входа владельца             |
-| POST                        | `/shop/requests`                                             | Гость либо Bearer-токен                  |
-| GET                         | `/shop/me/requests`, `/shop/me/favorites`                    | Свой аккаунт                             |
-| POST / DELETE               | `/shop/me/favorites/:id`                                     | Свой аккаунт                             |
-| GET                         | `/shop/me/consents`, `/legal/me/events`                      | Свои согласия                            |
+| Метод                       | Путь после `/api`                                            | Доступ                                    |
+| --------------------------- | ------------------------------------------------------------ | ----------------------------------------- |
+| GET                         | `/shop/products`, `/shop/products/:slug`                     | Открытый каталог                          |
+| GET                         | `/legal/documents`, `/legal/documents/:id/versions/:version` | Текущие и архивные документы              |
+| POST                        | `/auth/registration/request`                                 | `email`, `password`, `name`, `documents`  |
+| POST                        | `/auth/registration/confirm`                                 | `email`, `code`                           |
+| POST                        | `/auth/login/admin/confirm`, `/auth/login/admin/resend`      | Подтверждение входа владельца             |
+| POST                        | `/shop/requests`                                             | Гость либо Bearer-токен                   |
+| GET                         | `/shop/me/requests`, `/shop/me/favorites`                    | Свой аккаунт                              |
+| POST / DELETE               | `/shop/me/favorites/:id`                                     | Свой аккаунт                              |
+| GET                         | `/shop/me/consents`, `/legal/me/events`                      | Свои согласия                             |
 | POST                        | `/shop/me/consents/withdraw`                                 | `purpose`; для `account` — текущий пароль |
-| POST                        | `/shop/newsletter/request`                                   | `email`, две ссылки на документы         |
-| POST                        | `/shop/newsletter/confirm`, `/shop/newsletter/unsubscribe`   | Одноразовый/отписной `token`             |
-| GET / POST / PATCH / DELETE | `/shop/admin/products`, `/shop/admin/products/:id`           | Только admin                             |
-| GET                         | `/shop/images/:id`                                           | Фотографии опубликованных изделий        |
-| GET                         | `/shop/admin/images/:id`                                     | Только admin, включая скрытые изделия    |
-| GET / PATCH                 | `/shop/admin/requests`, `/shop/admin/requests/:id`           | Только admin                             |
+| POST                        | `/shop/newsletter/request`                                   | `email`, две ссылки на документы          |
+| POST                        | `/shop/newsletter/confirm`, `/shop/newsletter/unsubscribe`   | Одноразовый/отписной `token`              |
+| GET / POST / PATCH / DELETE | `/shop/admin/products`, `/shop/admin/products/:id`           | Только admin                              |
+| GET                         | `/shop/images/:id`                                           | Фотографии опубликованных изделий         |
+| GET                         | `/shop/admin/images/:id`                                     | Только admin, включая скрытые изделия     |
+| GET / PATCH                 | `/shop/admin/requests`, `/shop/admin/requests/:id`           | Только admin                              |
 
 Ссылка на документ — `{ id, version, sha256 }` из `/legal/documents`. Для регистрации нужны `pd-account` и `account-terms`; для рассылки — `pd-marketing` и `ads-email`; для заявки — `offer`. Устаревшие версии отвергаются.
 
@@ -143,6 +143,6 @@ npm run test:setup
 
 Для интеграционных тестов задайте `TEST_DATABASE_URL` на отдельную тестовую PostgreSQL. Тесты создают и удаляют только свои случайные схемы. Без этой переменной PostgreSQL-наборы пропускаются. CI задаёт её и проверяет миграции, транзакции заявок, раздельные согласия и сессии.
 
-`npm run test:smoke` проверяет запущенный тестовый API: readiness, каталог, запрет регистрации без согласий, права администратора, проверку цен, отсутствие дубликата заявки и загрузку/чтение/удаление фотографий с проверкой скрытого изделия. Скрипт создаёт явно тестовые заявку и изделие и должен запускаться только в тестовой среде. CI поднимает PostgreSQL/Redis и запускает эту проверку после миграций и демо-наполнения. Отдельные тесты фотографий проверяют реальный multipart, ограничения файлов, доступы и транзакционное хранение в PostgreSQL.
+`npm run test:smoke` проверяет запущенный тестовый API: readiness, каталог, запрет регистрации без согласий, вход владельца по паролю и одноразовому коду, права администратора, проверку цен, отсутствие дубликата заявки и загрузку/чтение/удаление фотографий с проверкой скрытого изделия. Скрипт создаёт явно тестовые заявку и изделие и должен запускаться только в тестовой среде с локальным Mailpit: при внешнем SMTP он завершится до отправки письма. CI поднимает PostgreSQL, Redis и Mailpit и запускает эту проверку после миграций и демо-наполнения. Отдельные тесты фотографий проверяют реальный multipart, ограничения файлов, доступы и транзакционное хранение в PostgreSQL.
 
 [Исходные механизмы авторизации, резервирования и эксплуатации](docs/TEMPLATE-README.md) · [Безопасность](SECURITY.md).
