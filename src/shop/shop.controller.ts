@@ -86,10 +86,7 @@ export class ShopController {
   }
   @Post('requests')
   @UseGuards(OptionalJwtGuard, CustomerOnlyGuard, ShopWriteGuard)
-  request(
-    @Body() dto: CreateRequestDto,
-    @Req() req: Request,
-  ) {
+  request(@Body() dto: CreateRequestDto, @Req() req: Request) {
     const user = req.user as User | undefined;
     return this.shop.createRequest(dto, user?.id ?? null, user?.role);
   }
@@ -105,19 +102,13 @@ export class ShopController {
   }
   @Post('me/favorites/:id')
   @UseGuards(JwtAuthGuard, CustomerOnlyGuard)
-  favorite(
-    @Req() req: Request,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  favorite(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
     const user = req.user as User;
     return this.shop.favorite(user.id, id, true, user.role);
   }
   @Delete('me/favorites/:id')
   @UseGuards(JwtAuthGuard, CustomerOnlyGuard)
-  unfavorite(
-    @Req() req: Request,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  unfavorite(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
     const user = req.user as User;
     return this.shop.favorite(user.id, id, false, user.role);
   }
