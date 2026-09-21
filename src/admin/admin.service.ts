@@ -174,7 +174,6 @@ export class AdminService {
     adminId: number,
     userId: number,
     blocked_reason: string,
-    password: string,
   ): Promise<void> {
     if (userId === adminId) {
       this.errorsService.badRequest(ErrMsg.ADMINISTRATOR_CANNOT_BE_BLOCKED);
@@ -186,8 +185,6 @@ export class AdminService {
     await qr.connect();
     await qr.startTransaction();
     try {
-      await this.verifyAdministratorPassword(qr.manager, adminId, password);
-
       const user = await qr.manager.findOneOrFail(User, {
         where: { id: userId },
         select: [ID, EMAIL, NICKNAME, ROLE, IS_BLOCKED],

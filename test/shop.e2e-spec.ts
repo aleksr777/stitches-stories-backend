@@ -22,7 +22,11 @@ import { User } from '../src/users/entities/user.entity';
 import { AuthSession } from '../src/auth/entities/auth-session.entity';
 import { EnvService } from '../src/common/env-service/env.service';
 import { MailService } from '../src/common/mail-service/mail.service';
-import { CODE, createCredentialFixture } from './helpers/credential-fixture';
+import {
+  CODE,
+  PASSWORD,
+  createCredentialFixture,
+} from './helpers/credential-fixture';
 import { Role } from '../src/common/types/role.enum';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -205,6 +209,8 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
       legal,
       {} as MailService,
       {} as EnvService,
+      fixture.hash,
+      fixture.auth,
     );
     await db.getRepository(Subscription).save({
       email: randomUUID() + '@other.test',
@@ -235,8 +241,10 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
       legal,
       {} as MailService,
       {} as EnvService,
+      fixture.hash,
+      fixture.auth,
     );
-    await service.withdraw(fixture.user.id, 'account');
+    await service.withdraw(fixture.user.id, 'account', PASSWORD);
     await expect(
       fixture.auth.validateUserById(fixture.user.id),
     ).rejects.toBeInstanceOf(UnauthorizedException);

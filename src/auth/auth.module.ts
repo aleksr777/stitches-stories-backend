@@ -10,6 +10,7 @@ import { EnvService } from '../common/env-service/env.service';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { User } from '../users/entities/user.entity';
 import { AuthController } from './auth.controller';
+import { AdminLoginService } from './admin-login.service';
 import { AuthService } from './auth.service';
 import { AuthSession } from './entities/auth-session.entity';
 import { RefreshOriginGuard } from './guards/refresh-origin.guard';
@@ -45,6 +46,7 @@ import { TokensService } from './tokens.service';
   ],
   providers: [
     AuthService,
+    AdminLoginService,
     RegistrationService,
     PasswordResetService,
     LoginRateLimitService,

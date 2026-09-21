@@ -14,8 +14,14 @@ import {
 import { CookieOptions, Request, Response } from 'express';
 import { SecurityConfigService } from '../common/security/security-config.service';
 import { AuthResponse, JwtTokens } from '../common/types/jwt-tokens.type';
+import { Role } from '../common/types/role.enum';
 import { User } from '../users/entities/user.entity';
+import { AdminLoginService } from './admin-login.service';
 import { AuthService } from './auth.service';
+import {
+  AdminLoginChallengeDto,
+  AdminLoginConfirmDto,
+} from './dto/admin-login-confirm.dto';
 import { PasswordResetConfirmDto } from './dto/password-reset-confirm.dto';
 import { PasswordResetRequestDto } from './dto/password-reset-request.dto';
 import { RegistrationConfirmDto } from './dto/registration-confirm.dto';
@@ -37,6 +43,7 @@ type RequestWithSafeCookies = Omit<Request, 'cookies'> & {
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly adminLoginService: AdminLoginService,
     private readonly registrationService: RegistrationService,
     private readonly passwordResetService: PasswordResetService,
     private readonly publicVerificationRateLimitService: PublicVerificationRateLimitService,
@@ -127,11 +134,47 @@ export class AuthController {
       };
     }
 
+    if (user.role === Role.ADMIN) {
+      this.clearRefreshCookie(res);
+      await this.publicVerificationRateLimitService.consume(
+        this.getRequestIp(req),
+      );
+      return this.adminLoginService.request(user);
+    }
+
     const tokens = await this.authService.loginNewSession(
       user.id,
       this.getSessionContext(req),
     );
     return this.handleAuthResult(res, tokens);
+  }
+
+  @Post('login/admin/confirm')
+  async confirmAdministratorLogin(
+    @Req() req: Request,
+    @Body() dto: AdminLoginConfirmDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const user = await this.adminLoginService.confirm(
+      dto.challenge_id,
+      dto.code,
+    );
+    const tokens = await this.authService.loginNewSession(
+      user.id,
+      this.getSessionContext(req),
+    );
+    return this.handleAuthResult(res, tokens);
+  }
+
+  @Post('login/admin/resend')
+  async resendAdministratorLoginCode(
+    @Req() req: Request,
+    @Body() dto: AdminLoginChallengeDto,
+  ) {
+    await this.publicVerificationRateLimitService.consume(
+      this.getRequestIp(req),
+    );
+    return this.adminLoginService.resend(dto.challenge_id);
   }
 
   @UseGuards(JwtAuthGuard)

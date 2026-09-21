@@ -120,23 +120,15 @@ export class AdminController {
   ) {
     const admin = req.user as User;
     const blockedReason = dto.blocked_reason ? dto.blocked_reason : '';
-    await this.adminService.blockUserById(
-      +admin.id,
-      +id,
-      blockedReason,
-      dto.password,
-    );
+    await this.adminService.blockUserById(+admin.id, +id, blockedReason);
     this.record(req, 'ADMIN_USER_BLOCKED', +id);
   }
 
   @Patch('users/unblock/:id')
   async unblockUser(
-    @Body() dto: AdminPasswordDto,
     @Req() req: Request,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    const admin = req.user as User;
-    await this.authService.verifyUserPassword(+admin.id, dto.password);
     await this.adminService.unblockUserById(+id);
     this.record(req, 'ADMIN_USER_UNBLOCKED', +id);
   }

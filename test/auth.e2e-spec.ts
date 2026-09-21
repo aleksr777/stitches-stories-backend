@@ -6,6 +6,7 @@ const registrationDetails = {
   ),
 };
 import {
+  ExecutionContext,
   HttpException,
   UnauthorizedException,
   ValidationPipe,
@@ -14,7 +15,9 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import { Server } from 'node:http';
+import { Request } from 'express';
 import request from 'supertest';
+import { AdminLoginService } from '../src/auth/admin-login.service';
 import { AuthController } from '../src/auth/auth.controller';
 import { AuthService } from '../src/auth/auth.service';
 import { PasswordResetService } from '../src/auth/password-reset.service';
@@ -22,10 +25,13 @@ import { PublicVerificationRateLimitService } from '../src/auth/public-verificat
 import { RegistrationService } from '../src/auth/registration.service';
 import { RefreshOriginGuard } from '../src/auth/guards/refresh-origin.guard';
 import { RefreshTokenGuard } from '../src/auth/guards/refresh-token.guard';
+import { LocalAuthGuard } from '../src/auth/guards/local-auth.guard';
 import { EnvService } from '../src/common/env-service/env.service';
 import { ErrorsService } from '../src/common/errors-service/errors.service';
 import { SecurityConfigService } from '../src/common/security/security-config.service';
 import { configureHttpSecurity } from '../src/common/security/security-http';
+import { Role } from '../src/common/types/role.enum';
+import { User } from '../src/users/entities/user.entity';
 
 const refreshTokens = {
   access_token: 'new-access-token',
@@ -91,6 +97,12 @@ describe('AuthController (e2e)', () => {
     request: jest.fn(),
     confirm: jest.fn(),
   };
+  const adminLoginService = {
+    request: jest.fn(),
+    confirm: jest.fn(),
+    resend: jest.fn(),
+  };
+  let loginUser: User;
   const publicVerificationRateLimitService = {
     consume: jest.fn(),
   };
@@ -99,8 +111,15 @@ describe('AuthController (e2e)', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    loginUser = {
+      id: 1,
+      role: Role.ADMIN,
+      email: 'admin@example.test',
+      is_blocked: false,
+    } as User;
     for (const service of [
       authService,
+      adminLoginService,
       registrationService,
       passwordResetService,
       publicVerificationRateLimitService,
@@ -130,6 +149,7 @@ describe('AuthController (e2e)', () => {
         RefreshOriginGuard,
         { provide: EnvService, useValue: envService },
         { provide: AuthService, useValue: authService },
+        { provide: AdminLoginService, useValue: adminLoginService },
         { provide: RegistrationService, useValue: registrationService },
         { provide: PasswordResetService, useValue: passwordResetService },
         {
@@ -138,6 +158,13 @@ describe('AuthController (e2e)', () => {
         },
       ],
     })
+      .overrideGuard(LocalAuthGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          context.switchToHttp().getRequest<Request>().user = loginUser;
+          return true;
+        },
+      })
       .overrideGuard(RefreshTokenGuard)
       .useValue({
         canActivate: (context: {
@@ -378,5 +405,100 @@ describe('AuthController (e2e)', () => {
 
     expect(authService.loginNewSession).not.toHaveBeenCalled();
     expect(response.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('requires an emailed code before creating an administrator session', async () => {
+    const challenge = {
+      admin_confirmation_required: true,
+      challenge_id: 'a'.repeat(64),
+      expires_in: 300,
+      retry_after: 60,
+      max_attempts: 5,
+      message: 'Код отправлен.',
+    };
+    publicVerificationRateLimitService.consume.mockResolvedValue(undefined);
+    adminLoginService.request.mockResolvedValue(challenge);
+
+    const response = await request(getServer())
+      .post('/api/auth/login')
+      .send({ email: loginUser.email, password: 'admin-password' })
+      .expect(201);
+
+    expect(response.body).toEqual(challenge);
+    expect(adminLoginService.request).toHaveBeenCalledWith(loginUser);
+    expect(authService.loginNewSession).not.toHaveBeenCalled();
+    expect(response.headers['set-cookie']?.[0]).toContain('refresh_token=;');
+    expect(publicVerificationRateLimitService.consume).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an ordinary password login available without administrator confirmation', async () => {
+    loginUser.role = Role.USER;
+    authService.loginNewSession.mockResolvedValue(refreshTokens);
+
+    const response = await request(getServer())
+      .post('/api/auth/login')
+      .send({ email: loginUser.email, password: 'user-password' })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      access_token: refreshTokens.access_token,
+    });
+    expect(adminLoginService.request).not.toHaveBeenCalled();
+  });
+
+  it('issues a refresh cookie only after a valid administrator confirmation', async () => {
+    adminLoginService.confirm.mockResolvedValue(loginUser);
+    authService.loginNewSession.mockResolvedValue(refreshTokens);
+
+    const response = await request(getServer())
+      .post('/api/auth/login/admin/confirm')
+      .set('User-Agent', 'admin-confirm-test')
+      .send({ challenge_id: 'a'.repeat(64), code: '123456' })
+      .expect(201);
+
+    expect(adminLoginService.confirm).toHaveBeenCalledWith(
+      'a'.repeat(64),
+      '123456',
+    );
+    expect(authService.loginNewSession).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ userAgent: 'admin-confirm-test' }),
+    );
+    expect(response.body).toMatchObject({
+      access_token: refreshTokens.access_token,
+    });
+    expect(response.body).not.toHaveProperty('refresh_token');
+    expect(response.headers['set-cookie']?.[0]).toContain('HttpOnly');
+  });
+
+  it('validates administrator confirmation payloads and rate-limits resend requests', async () => {
+    adminLoginService.confirm.mockRejectedValue(
+      new UnauthorizedException('Неверный код'),
+    );
+    await request(getServer())
+      .post('/api/auth/login/admin/confirm')
+      .send({ challenge_id: 'a'.repeat(64), code: '000000' })
+      .expect(401);
+    await request(getServer())
+      .post('/api/auth/login/admin/confirm')
+      .send({ challenge_id: 'short', code: 'not-a-code' })
+      .expect(400);
+
+    publicVerificationRateLimitService.consume.mockResolvedValue(undefined);
+    adminLoginService.resend.mockResolvedValue({
+      admin_confirmation_required: true,
+      challenge_id: 'b'.repeat(64),
+      expires_in: 300,
+      retry_after: 60,
+      max_attempts: 5,
+      message: 'Код отправлен.',
+    });
+    await request(getServer())
+      .post('/api/auth/login/admin/resend')
+      .send({ challenge_id: 'a'.repeat(64) })
+      .expect(201);
+
+    expect(publicVerificationRateLimitService.consume).toHaveBeenCalledTimes(1);
+    expect(adminLoginService.resend).toHaveBeenCalledWith('a'.repeat(64));
   });
 });

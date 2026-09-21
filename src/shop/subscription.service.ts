@@ -8,8 +8,10 @@ import { Cron } from '@nestjs/schedule';
 import { randomBytes } from 'node:crypto';
 import { DataSource, EntityManager, LessThan } from 'typeorm';
 import { LegalService, digest } from '../legal/legal.service';
+import { AuthService } from '../auth/auth.service';
 import { MailService } from '../common/mail-service/mail.service';
 import { EnvService } from '../common/env-service/env.service';
+import { HashService } from '../common/hash-service/hash.service';
 import { User } from '../users/entities/user.entity';
 import { Role } from '../common/types/role.enum';
 import { NewsletterDto } from './shop.dto';
@@ -26,6 +28,8 @@ export class SubscriptionService {
     private readonly legal: LegalService,
     private readonly mail: MailService,
     private readonly env: EnvService,
+    private readonly hash: HashService,
+    private readonly auth: AuthService,
   ) {}
   async request(dto: NewsletterDto) {
     this.legal.assertReferences(dto.documents, ids);
@@ -154,11 +158,11 @@ export class SubscriptionService {
       activeUntil: row?.activeUntil ?? null,
     };
   }
-  async withdraw(userId: number, purpose: string) {
+  async withdraw(userId: number, purpose: string, password?: string) {
     return this.db.transaction(async (m) => {
       const user = await m.findOneOrFail(User, {
         where: { id: userId },
-        select: ['id', 'email', 'role'],
+        select: ['id', 'email', 'role', 'password'],
         lock: { mode: 'pessimistic_write' },
       });
       if (purpose === 'marketing') {
@@ -173,9 +177,13 @@ export class SubscriptionService {
         throw new ConflictException(
           'Кабинет администратора закрывается после передачи управления.',
         );
+      if (!password || !(await this.hash.compare(password, user.password))) {
+        throw new BadRequestException('Неверный текущий пароль.');
+      }
       await this.legal.withdraw(m, userId, ['pd-account']);
       await m.delete(Favorite, { userId });
       await m.update(Subscription, { userId }, { userId: null });
+      await this.auth.revokeAllSessions(userId, 'account_deleted', m);
       await m.delete(User, { id: userId });
       return { accountClosed: true };
     });

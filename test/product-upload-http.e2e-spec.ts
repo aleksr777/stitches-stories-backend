@@ -12,6 +12,7 @@ import sharp from 'sharp';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 import { ErrorsService } from '../src/common/errors-service/errors.service';
 import { RolesGuard } from '../src/common/guards/roles.guard';
+import { SecurityConfigService } from '../src/common/security/security-config.service';
 import {
   ShopAdminController,
   ShopController,
@@ -56,6 +57,13 @@ describe('Product photo HTTP boundary', () => {
       providers: [
         { provide: ShopService, useValue: shop },
         { provide: SubscriptionService, useValue: {} },
+        {
+          provide: SecurityConfigService,
+          useValue: {
+            getRefreshCookieSecure: () => false,
+            getRefreshCookieSameSite: () => 'lax',
+          },
+        },
         RolesGuard,
         ErrorsService,
       ],

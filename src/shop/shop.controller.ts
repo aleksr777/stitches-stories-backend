@@ -15,6 +15,8 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { clearRefreshCookie } from '../auth/auth-response.util';
+import { SecurityConfigService } from '../common/security/security-config.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Role } from '../common/types/role.enum';
@@ -55,6 +57,7 @@ export class ShopController {
   constructor(
     private readonly shop: ShopService,
     private readonly subscriptions: SubscriptionService,
+    private readonly securityConfig: SecurityConfigService,
   ) {}
   @Get('config') config() {
     return {
@@ -122,11 +125,18 @@ export class ShopController {
   @Get('me/consents') @UseGuards(JwtAuthGuard) consents(@Req() req: Request) {
     return this.subscriptions.status((req.user as User).id);
   }
-  @Post('me/consents/withdraw') @UseGuards(JwtAuthGuard) withdraw(
+  @Post('me/consents/withdraw') @UseGuards(JwtAuthGuard) async withdraw(
     @Req() req: Request,
     @Body() dto: WithdrawDto,
+    @Res({ passthrough: true }) response: Response,
   ) {
-    return this.subscriptions.withdraw((req.user as User).id, dto.purpose);
+    const result = await this.subscriptions.withdraw(
+      (req.user as User).id,
+      dto.purpose,
+      dto.password,
+    );
+    if (result.accountClosed) clearRefreshCookie(response, this.securityConfig);
+    return result;
   }
 }
 @Controller('shop/admin')

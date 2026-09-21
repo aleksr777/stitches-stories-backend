@@ -17,6 +17,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { AcceptanceDto, DocumentRefDto } from '../legal/legal.dto';
@@ -80,4 +81,9 @@ export class TokenDto {
 }
 export class WithdrawDto {
   @IsIn(['account', 'marketing']) purpose!: string;
+
+  @ValidateIf((dto: WithdrawDto) => dto.purpose === 'account')
+  @IsString()
+  @Length(8, 100)
+  password?: string;
 }

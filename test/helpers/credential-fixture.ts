@@ -6,6 +6,7 @@ import { DataSource } from 'typeorm';
 import { ActivityService } from '../../src/activity/activity.service';
 import { SecurityAuditService } from '../../src/audit/security-audit.service';
 import { AuthController } from '../../src/auth/auth.controller';
+import { AdminLoginService } from '../../src/auth/admin-login.service';
 import { AuthService } from '../../src/auth/auth.service';
 import { AuthSession } from '../../src/auth/entities/auth-session.entity';
 import { PasswordResetService } from '../../src/auth/password-reset.service';
@@ -171,6 +172,7 @@ export const createCredentialFixture = async (db: DataSource) => {
   );
   const authController = new AuthController(
     auth,
+    {} as AdminLoginService,
     registration,
     reset,
     {} as PublicVerificationRateLimitService,
