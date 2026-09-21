@@ -6,7 +6,11 @@ import { shopEntities } from './shop.entities';
 import { ShopController, ShopAdminController } from './shop.controller';
 import { ShopService } from './shop.service';
 import { SubscriptionService } from './subscription.service';
-import { ShopWriteGuard, OptionalJwtGuard } from './shop.guards';
+import {
+  CustomerOnlyGuard,
+  OptionalJwtGuard,
+  ShopWriteGuard,
+} from './shop.guards';
 @Module({
   imports: [AuthModule, LegalModule, TypeOrmModule.forFeature(shopEntities)],
   controllers: [ShopController, ShopAdminController],
@@ -15,6 +19,7 @@ import { ShopWriteGuard, OptionalJwtGuard } from './shop.guards';
     SubscriptionService,
     ShopWriteGuard,
     OptionalJwtGuard,
+    CustomerOnlyGuard,
   ],
 })
 export class ShopModule {}

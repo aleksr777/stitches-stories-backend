@@ -30,7 +30,11 @@ import {
 } from './shop.dto';
 import { ShopService } from './shop.service';
 import { SubscriptionService } from './subscription.service';
-import { OptionalJwtGuard, ShopWriteGuard } from './shop.guards';
+import {
+  CustomerOnlyGuard,
+  OptionalJwtGuard,
+  ShopWriteGuard,
+} from './shop.guards';
 import {
   ProductFilesInterceptor,
   ProductImageUpload,
@@ -80,27 +84,37 @@ export class ShopController {
   ) {
     sendProductImage(await this.shop.image(id), response);
   }
-  @Post('requests') @UseGuards(OptionalJwtGuard, ShopWriteGuard) request(
+  @Post('requests')
+  @UseGuards(OptionalJwtGuard, CustomerOnlyGuard, ShopWriteGuard)
+  request(
     @Body() dto: CreateRequestDto,
     @Req() req: Request,
   ) {
     const user = req.user as User | undefined;
     return this.shop.createRequest(dto, user?.id ?? null, user?.role);
   }
-  @Get('me/requests') @UseGuards(JwtAuthGuard) requests(@Req() req: Request) {
+  @Get('me/requests')
+  @UseGuards(JwtAuthGuard, CustomerOnlyGuard)
+  requests(@Req() req: Request) {
     return this.shop.requests((req.user as User).id);
   }
-  @Get('me/favorites') @UseGuards(JwtAuthGuard) favorites(@Req() req: Request) {
+  @Get('me/favorites')
+  @UseGuards(JwtAuthGuard, CustomerOnlyGuard)
+  favorites(@Req() req: Request) {
     return this.shop.favorites((req.user as User).id);
   }
-  @Post('me/favorites/:id') @UseGuards(JwtAuthGuard) favorite(
+  @Post('me/favorites/:id')
+  @UseGuards(JwtAuthGuard, CustomerOnlyGuard)
+  favorite(
     @Req() req: Request,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const user = req.user as User;
     return this.shop.favorite(user.id, id, true, user.role);
   }
-  @Delete('me/favorites/:id') @UseGuards(JwtAuthGuard) unfavorite(
+  @Delete('me/favorites/:id')
+  @UseGuards(JwtAuthGuard, CustomerOnlyGuard)
+  unfavorite(
     @Req() req: Request,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
