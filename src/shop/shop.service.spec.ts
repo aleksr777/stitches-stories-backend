@@ -12,10 +12,13 @@ describe('ShopService owner customer actions', () => {
   } as CreateRequestDto;
   const productId = '22222222-2222-4222-8222-222222222222';
 
-  it('rejects purchase requests and favorite changes from the shop owner', async () => {
+  it('rejects purchase requests and favorites access from the shop owner', async () => {
     await expect(
       shop.createRequest(request, 1, Role.ADMIN),
     ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(shop.favorites(1, Role.ADMIN)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
     await expect(
       shop.favorite(1, productId, true, Role.ADMIN),
     ).rejects.toBeInstanceOf(ForbiddenException);

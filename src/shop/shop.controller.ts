@@ -98,7 +98,8 @@ export class ShopController {
   @Get('me/favorites')
   @UseGuards(JwtAuthGuard, CustomerOnlyGuard)
   favorites(@Req() req: Request) {
-    return this.shop.favorites((req.user as User).id);
+    const user = req.user as User;
+    return this.shop.favorites(user.id, user.role);
   }
   @Post('me/favorites/:id')
   @UseGuards(JwtAuthGuard, CustomerOnlyGuard)

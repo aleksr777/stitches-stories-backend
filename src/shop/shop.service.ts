@@ -166,7 +166,11 @@ export class ShopService {
       .getRepository(OrderRequest)
       .find({ where: { userId }, order: { createdAt: 'DESC' }, take: 200 });
   }
-  async favorites(userId: number) {
+  async favorites(userId: number, role?: Role) {
+    if (role === Role.ADMIN)
+      throw new ForbiddenException(
+        'Владелец магазина не может использовать избранное.',
+      );
     return (await this.db.getRepository(Favorite).findBy({ userId })).map(
       (f) => f.productId,
     );
