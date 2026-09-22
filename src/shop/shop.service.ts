@@ -11,6 +11,7 @@ import { LegalService, canonical, digest } from '../legal/legal.service';
 import { Role } from '../common/types/role.enum';
 import { CreateRequestDto, ProductDto } from './shop.dto';
 import { Favorite, OrderRequest, Product, ProductImage } from './shop.entities';
+import { ProductCategory } from './category.entity';
 import {
   MAX_PRODUCT_IMAGES,
   ProductImageUpload,
@@ -252,6 +253,15 @@ export class ShopService {
     try {
       return await this.db.transaction(async (m) => {
         const repo = m.getRepository(Product);
+        if (
+          dto.category &&
+          !(await m
+            .getRepository(ProductCategory)
+            .existsBy({ id: dto.category }))
+        )
+          throw new BadRequestException(
+            'Категория не найдена. Обновите список и выберите другую.',
+          );
         const existing = id
           ? await repo.findOne({
               where: { id },
@@ -284,7 +294,12 @@ export class ShopService {
         );
         const productId = id ?? randomUUID();
         const saved = await repo.save(
-          repo.create({ ...dto, id: productId, images }),
+          repo.create({
+            ...dto,
+            category: dto.category ?? null,
+            id: productId,
+            images,
+          }),
         );
         if (uploaded.length)
           await imageRepo.insert(
@@ -298,6 +313,14 @@ export class ShopService {
         return saved;
       });
     } catch (e) {
+      if (
+        e instanceof QueryFailedError &&
+        (e.driverError as { constraint?: string }).constraint ===
+          'FK_product_category'
+      )
+        throw new ConflictException(
+          'Категория уже удалена. Обновите список и выберите другую.',
+        );
       if (
         e instanceof QueryFailedError &&
         (e.driverError as { code?: string }).code === '23505'

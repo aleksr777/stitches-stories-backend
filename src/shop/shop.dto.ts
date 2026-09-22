@@ -51,7 +51,7 @@ export class CreateRequestDto {
 export class ProductDto {
   @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/) @MaxLength(100) slug!: string;
   @Transform(trim) @IsString() @Length(2, 200) name!: string;
-  @IsIn(['keychains', 'covers']) category!: string;
+  @IsOptional() @IsString() @Length(1, 36) category?: string | null;
   @IsInt() @Min(1) @Max(1000000) priceRub!: number;
   @IsString() @Length(10, 6000) description!: string;
   @IsString() @Length(2, 250) materials!: string;

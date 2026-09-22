@@ -1,5 +1,6 @@
 import dataSource from '../../data-source';
 import { Product } from './shop.entities';
+import { ProductCategory } from './category.entity';
 
 async function seed() {
   if (process.env.NODE_ENV === 'production')
@@ -13,6 +14,13 @@ async function seed() {
       ['leaves', 'Обложка «Листья»', 'covers', 2500],
     ] as const;
     for (const [slug, name, category, priceRub] of rows) {
+      // Do not recreate categories deliberately removed by the owner.
+      if (
+        !(await dataSource
+          .getRepository(ProductCategory)
+          .existsBy({ id: category }))
+      )
+        continue;
       await dataSource
         .getRepository(Product)
         .createQueryBuilder()

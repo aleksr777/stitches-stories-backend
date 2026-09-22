@@ -114,6 +114,21 @@ assert(
   'Run seed:demo in a non-production test environment',
 );
 const docs = (await request('/legal/documents')).data;
+const categories = (await request('/shop/categories')).data;
+assert(categories.some((category) => category.id === 'covers'));
+assert(
+  products.every(
+    (product) =>
+      !product.category ||
+      categories.some((category) => category.id === product.category),
+  ),
+);
+assert(
+  categories.every(
+    (category) => !('nameKey' in category) && !('productCount' in category),
+  ),
+);
+assert.equal((await request('/shop/admin/categories')).status, 401);
 assert.equal(docs.length, 11);
 assert.equal((await request('/shop/admin/requests')).status, 401);
 assert.equal((await request('/journal/posts')).status, 404);
@@ -172,6 +187,26 @@ const admin = await request(
 );
 assert.equal(admin.status, 200);
 assert(admin.data.some((r) => r.id === first.data.id));
+const categoryCreated = await request(
+  '/shop/admin/categories',
+  {
+    name: 'Панно ' + randomUUID(),
+  },
+  confirmedLogin.data.access_token,
+);
+assert.equal(categoryCreated.status, 201);
+const categoryPath = base + '/shop/admin/categories/' + categoryCreated.data.id;
+const categoryHeaders = {
+  Authorization: 'Bearer ' + confirmedLogin.data.access_token,
+  'Content-Type': 'application/json',
+};
+const categoryRenamed = await fetch(categoryPath, {
+  method: 'PATCH',
+  headers: categoryHeaders,
+  body: JSON.stringify({ name: 'Картины ' + categoryCreated.data.id }),
+});
+assert.equal(categoryRenamed.status, 200);
+assert.equal((await categoryRenamed.json()).id, categoryCreated.data.id);
 const photoBytes = await sharp({
   create: { width: 3, height: 4, channels: 3, background: '#d9b7b1' },
 })
@@ -180,7 +215,7 @@ const photoBytes = await sharp({
 const photoProduct = {
   slug: 'smoke-photo-' + randomUUID(),
   name: 'Тестовая фотография',
-  category: 'covers',
+  category: categoryCreated.data.id,
   priceRub: 1000,
   description: 'Изделие для проверки загрузки фотографии',
   materials: 'Хлопок',
@@ -225,6 +260,22 @@ await savePhotoProduct(
   withPhoto.id,
 );
 assert.equal((await fetch(base + withPhoto.images[0])).status, 404);
+assert.equal(
+  (await fetch(categoryPath, { method: 'DELETE', headers: categoryHeaders }))
+    .status,
+  409,
+);
+const adminCategories = await request(
+  '/shop/admin/categories',
+  undefined,
+  confirmedLogin.data.access_token,
+);
+assert.equal(
+  adminCategories.data.find(
+    (category) => category.id === categoryCreated.data.id,
+  ).productCount,
+  1,
+);
 const privatePath = withPhoto.images[0].replace('/images/', '/admin/images/');
 assert.equal((await fetch(base + privatePath)).status, 401);
 assert.equal(
@@ -241,6 +292,17 @@ const deleted = await fetch(base + '/shop/admin/products/' + withPhoto.id, {
 });
 assert.equal(deleted.status, 200);
 assert.deepEqual(await deleted.json(), { deleted: true });
+assert.equal(
+  (await fetch(categoryPath, { method: 'DELETE', headers: categoryHeaders }))
+    .status,
+  200,
+);
+assert.equal(
+  (await request('/shop/categories')).data.some(
+    (category) => category.id === categoryCreated.data.id,
+  ),
+  false,
+);
 const productsAfterDeletion = await request(
   '/shop/admin/products',
   undefined,
@@ -263,5 +325,5 @@ assert.equal(
   404,
 );
 console.log(
-  'Application readiness, catalog, consent validation, price checks, request idempotency, administrator access and product image upload/read/edit/delete passed.',
+  'Application readiness, catalog, consent validation, price checks, request idempotency, administrator access, category management and product image upload/read/edit/delete passed.',
 );

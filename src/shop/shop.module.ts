@@ -7,15 +7,26 @@ import { ShopController, ShopAdminController } from './shop.controller';
 import { ShopService } from './shop.service';
 import { SubscriptionService } from './subscription.service';
 import {
+  AdminCategoriesController,
+  CategoriesController,
+} from './category.controller';
+import { CategoryService } from './category.service';
+import {
   CustomerOnlyGuard,
   OptionalJwtGuard,
   ShopWriteGuard,
 } from './shop.guards';
 @Module({
   imports: [AuthModule, LegalModule, TypeOrmModule.forFeature(shopEntities)],
-  controllers: [ShopController, ShopAdminController],
+  controllers: [
+    ShopController,
+    ShopAdminController,
+    CategoriesController,
+    AdminCategoriesController,
+  ],
   providers: [
     ShopService,
+    CategoryService,
     SubscriptionService,
     ShopWriteGuard,
     OptionalJwtGuard,

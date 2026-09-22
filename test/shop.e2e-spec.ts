@@ -28,6 +28,7 @@ import {
   createCredentialFixture,
 } from './helpers/credential-fixture';
 import { Role } from '../src/common/types/role.enum';
+import { ProductCategory } from '../src/shop/category.entity';
 
 const url = process.env.TEST_DATABASE_URL;
 const databaseTests = url ? describe : describe.skip;
@@ -66,6 +67,9 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
     legal = new LegalService(db);
     await legal.onModuleInit();
     shop = new ShopService(db, legal);
+    await db
+      .getRepository(ProductCategory)
+      .insert({ id: 'covers', name: 'Обложки', nameKey: 'обложки' });
   });
   beforeEach(async () => {
     fixture = await createCredentialFixture(db);

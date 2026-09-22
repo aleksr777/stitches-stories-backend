@@ -16,6 +16,7 @@ import {
 import { ShopService } from '../src/shop/shop.service';
 import { ProductDto } from '../src/shop/shop.dto';
 import { LegalService } from '../src/legal/legal.service';
+import { ProductCategory } from '../src/shop/category.entity';
 
 const url = process.env.TEST_DATABASE_URL;
 (url ? describe : describe.skip)('Product images in PostgreSQL', () => {
@@ -50,6 +51,9 @@ const url = process.env.TEST_DATABASE_URL;
       synchronize: true,
     }).initialize();
     shop = new ShopService(db, {} as LegalService);
+    await db
+      .getRepository(ProductCategory)
+      .insert({ id: 'covers', name: 'Обложки', nameKey: 'обложки' });
     buffer = await sharp({
       create: { width: 3, height: 4, channels: 3, background: '#d9b7b1' },
     })

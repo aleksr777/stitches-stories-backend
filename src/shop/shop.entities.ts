@@ -10,12 +10,26 @@ import {
   ManyToOne,
 } from 'typeorm';
 import { DocumentRef } from '../legal/legal.types';
+import { ProductCategory } from './category.entity';
 @Entity('product')
+@Index('IDX_product_category', ['category'])
 export class Product {
   @PrimaryGeneratedColumn('uuid') id!: string;
   @Column({ type: 'varchar', length: 100, unique: true }) slug!: string;
   @Column({ type: 'varchar', length: 200 }) name!: string;
-  @Column({ type: 'varchar', length: 30 }) category!: string;
+  @Column({ type: 'varchar', length: 36, nullable: true }) category!:
+    | string
+    | null;
+  @ManyToOne(() => ProductCategory, {
+    nullable: true,
+    onDelete: 'RESTRICT',
+    onUpdate: 'RESTRICT',
+  })
+  @JoinColumn({
+    name: 'category',
+    foreignKeyConstraintName: 'FK_product_category',
+  })
+  categoryDetails!: ProductCategory | null;
   @Column({ type: 'int' }) priceRub!: number;
   @Column({ type: 'text' }) description!: string;
   @Column({ type: 'varchar', length: 250 }) materials!: string;
@@ -95,6 +109,7 @@ export class Subscription {
   @UpdateDateColumn({ type: 'timestamptz' }) updatedAt!: Date;
 }
 export const shopEntities = [
+  ProductCategory,
   Product,
   ProductImage,
   OrderRequest,
