@@ -12,6 +12,7 @@ import { Role } from '../common/types/role.enum';
 import { CreateRequestDto, ProductDto } from './shop.dto';
 import { Favorite, OrderRequest, Product, ProductImage } from './shop.entities';
 import { ProductCategory } from './category.entity';
+import { PaymentInvoice } from './payments/payment.entity';
 import {
   MAX_PRODUCT_IMAGES,
   ProductImageUpload,
@@ -162,10 +163,11 @@ export class ShopService {
       throw err;
     }
   }
-  requests(userId: number) {
-    return this.db
+  async requests(userId: number) {
+    const orders = await this.db
       .getRepository(OrderRequest)
       .find({ where: { userId }, order: { createdAt: 'DESC' }, take: 200 });
+    return this.withPayments(orders);
   }
   async favorites(userId: number, role?: Role) {
     if (role === Role.ADMIN)
@@ -197,17 +199,50 @@ export class ShopService {
     } else await this.db.getRepository(Favorite).delete({ userId, productId });
     return { saved: enabled };
   }
-  allRequests() {
-    return this.db
+  async allRequests() {
+    const orders = await this.db
       .getRepository(OrderRequest)
       .find({ order: { createdAt: 'DESC' }, take: 200 });
+    return this.withPayments(orders);
+  }
+  private async withPayments(orders: OrderRequest[]) {
+    if (!orders.length) return [];
+    const payments = await this.db.getRepository(PaymentInvoice).find({
+      select: {
+        id: true,
+        orderId: true,
+        status: true,
+        amountRub: true,
+        isTest: true,
+      },
+      where: { orderId: In(orders.map((order) => order.id)) },
+    });
+    return orders.map((order) => ({
+      ...order,
+      payment: payments.find((payment) => payment.orderId === order.id) ?? null,
+    }));
   }
   async updateStatus(id: string, status: string) {
-    const result = await this.db
-      .getRepository(OrderRequest)
-      .update(id, { status });
-    if (!result.affected) throw new NotFoundException();
-    return { updated: true };
+    return this.db.transaction(async (manager) => {
+      const order = await manager.findOne(OrderRequest, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!order) throw new NotFoundException();
+      if (
+        status !== 'agreed' &&
+        (await manager.existsBy(PaymentInvoice, {
+          orderId: id,
+          status: In(['ready', 'pending']),
+        }))
+      )
+        throw new ConflictException(
+          'По заявке выставлен действующий счёт. Дождитесь оплаты или окончания срока счёта.',
+        );
+      order.status = status;
+      await manager.save(order);
+      return { updated: true };
+    });
   }
   async image(id: string, admin = false) {
     const query = this.db

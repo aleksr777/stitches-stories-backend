@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { DocumentRef } from '../legal/legal.types';
 import { ProductCategory } from './category.entity';
+import { PaymentInvoice } from './payments/payment.entity';
 @Entity('product')
 @Index('IDX_product_category', ['category'])
 export class Product {
@@ -109,6 +110,7 @@ export class Subscription {
   @UpdateDateColumn({ type: 'timestamptz' }) updatedAt!: Date;
 }
 export const shopEntities = [
+  PaymentInvoice,
   ProductCategory,
   Product,
   ProductImage,

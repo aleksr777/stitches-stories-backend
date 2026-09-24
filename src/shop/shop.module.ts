@@ -12,6 +12,13 @@ import {
 } from './category.controller';
 import { CategoryService } from './category.service';
 import {
+  PaymentController,
+  AdminPaymentController,
+} from './payments/payment.controller';
+import { PaymentConfigService } from './payments/payment-config.service';
+import { PaymentService } from './payments/payment.service';
+import { PaymentMaintenanceService } from './payments/payment-maintenance.service';
+import {
   CustomerOnlyGuard,
   OptionalJwtGuard,
   ShopWriteGuard,
@@ -19,12 +26,17 @@ import {
 @Module({
   imports: [AuthModule, LegalModule, TypeOrmModule.forFeature(shopEntities)],
   controllers: [
+    PaymentController,
+    AdminPaymentController,
     ShopController,
     ShopAdminController,
     CategoriesController,
     AdminCategoriesController,
   ],
   providers: [
+    PaymentConfigService,
+    PaymentService,
+    PaymentMaintenanceService,
     ShopService,
     CategoryService,
     SubscriptionService,
