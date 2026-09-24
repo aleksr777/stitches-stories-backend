@@ -11,7 +11,7 @@ import { Server } from 'node:http';
 import request from 'supertest';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 import { ErrorsService } from '../src/common/errors-service/errors.service';
-import { OptionalJwtGuard, ShopWriteGuard } from '../src/shop/shop.guards';
+import { ShopWriteGuard } from '../src/shop/shop.guards';
 import {
   AdminPaymentController,
   PaymentController,
@@ -45,10 +45,9 @@ describe('SBP HTTP permissions and callback validation', () => {
       return 'OK' + invoice.number;
     }),
   };
-  const authenticate = (context: ExecutionContext, optional = false) => {
+  const authenticate = (context: ExecutionContext) => {
     const req = context.switchToHttp().getRequest<Request>();
     const value = req.headers.authorization;
-    if (!value && optional) return true;
     if (!['Bearer admin', 'Bearer customer'].includes(value ?? ''))
       throw new UnauthorizedException();
     req.user = { id: 123, role: value === 'Bearer admin' ? 'admin' : 'user' };
@@ -69,10 +68,6 @@ describe('SBP HTTP permissions and callback validation', () => {
       .overrideGuard(JwtAuthGuard)
       .useValue({
         canActivate: (context: ExecutionContext) => authenticate(context),
-      })
-      .overrideGuard(OptionalJwtGuard)
-      .useValue({
-        canActivate: (context: ExecutionContext) => authenticate(context, true),
       })
       .overrideGuard(ShopWriteGuard)
       .useValue({ canActivate: () => true })
@@ -115,8 +110,27 @@ describe('SBP HTTP permissions and callback validation', () => {
       .get('/api/shop/admin/payments/config')
       .expect(401);
   });
-  it('rejects owner payment, forged totals, keys, and incomplete contract acceptance', async () => {
+  it('requires an account for invoice view and payment, rejects the owner and ignores browser fields', async () => {
     const url = '/api/shop/payments/' + invoice.id + '/start';
+    const view = '/api/shop/payments/' + invoice.id + '/view';
+    const documents = ['offer', 'payment', 'returns', 'seller'].map((id) => ({
+      id,
+      version: 'v1',
+      sha256: 'a'.repeat(64),
+    }));
+    await request(app.getHttpServer() as Server)
+      .post(view)
+      .send({})
+      .expect(401);
+    await request(app.getHttpServer() as Server)
+      .post(view)
+      .set('Authorization', 'Bearer customer')
+      .send({})
+      .expect(200);
+    await request(app.getHttpServer() as Server)
+      .post(url)
+      .send({ documents })
+      .expect(401);
     await request(app.getHttpServer() as Server)
       .post(url)
       .set('Authorization', 'Bearer admin')
@@ -124,17 +138,8 @@ describe('SBP HTTP permissions and callback validation', () => {
       .expect(403);
     await request(app.getHttpServer() as Server)
       .post(url)
-      .send({ accessToken: 'x', documents: [] })
-      .expect(400);
-    const documents = ['offer', 'payment', 'returns', 'seller'].map((id) => ({
-      id,
-      version: 'v1',
-      sha256: 'a'.repeat(64),
-    }));
-    await request(app.getHttpServer() as Server)
-      .post(url)
+      .set('Authorization', 'Bearer customer')
       .send({
-        accessToken: 'a'.repeat(64),
         documents,
         amountRub: 1,
         merchantLogin: 'attacker',
@@ -143,7 +148,8 @@ describe('SBP HTTP permissions and callback validation', () => {
     expect(service.start).not.toHaveBeenCalled();
     await request(app.getHttpServer() as Server)
       .post(url)
-      .send({ accessToken: 'a'.repeat(64), documents })
+      .set('Authorization', 'Bearer customer')
+      .send({ documents })
       .expect(200)
       .expect('Cache-Control', 'no-store');
   });

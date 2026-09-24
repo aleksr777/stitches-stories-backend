@@ -4,10 +4,8 @@ import {
   ArrayMinSize,
   IsArray,
   IsInt,
-  IsOptional,
   IsString,
   Length,
-  Matches,
   Max,
   Min,
   ValidateNested,
@@ -23,10 +21,7 @@ export class IssuePaymentDto {
   @Length(5, 1000)
   fulfillment!: string;
 }
-export class PaymentAccessDto {
-  @IsOptional() @Matches(/^[a-f0-9]{64}$/) accessToken?: string;
-}
-export class StartPaymentDto extends PaymentAccessDto {
+export class StartPaymentDto {
   @IsArray()
   @ArrayMinSize(4)
   @ArrayMaxSize(4)

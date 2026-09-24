@@ -8,7 +8,6 @@ export const testAccount: PaymentAccount = {
   mode: 'test',
   password1: 'synthetic-test-password-one',
   password2: 'synthetic-test-password-two',
-  linkSecret: 'c'.repeat(64),
   sellerName: 'Тестовый продавец',
   sellerInn: '000000000000',
 };

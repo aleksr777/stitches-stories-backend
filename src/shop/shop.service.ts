@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { DataSource, QueryFailedError, In } from 'typeorm';
 import { randomUUID } from 'node:crypto';
@@ -70,11 +71,11 @@ export class ShopService {
       createdAt: order.createdAt,
     };
   }
-  async createRequest(
-    dto: CreateRequestDto,
-    userId: number | null,
-    role?: Role,
-  ) {
+  async createRequest(dto: CreateRequestDto, userId: number, role?: Role) {
+    if (!Number.isInteger(userId) || userId < 1)
+      throw new UnauthorizedException(
+        'Войдите в аккаунт, чтобы отправить заявку.',
+      );
     if (role === Role.ADMIN)
       throw new ForbiddenException(
         'Владелец магазина не может отправлять заявки на покупку.',

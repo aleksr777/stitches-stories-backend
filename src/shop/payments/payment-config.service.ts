@@ -1,5 +1,4 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { PaymentInvoice } from './payment.entity';
 
 export type PaymentAccount = {
@@ -8,7 +7,6 @@ export type PaymentAccount = {
   mode: 'test' | 'live';
   password1: string;
   password2: string;
-  linkSecret: string;
   sellerName: string;
   sellerInn: string;
 };
@@ -79,7 +77,6 @@ export class PaymentConfigService {
       'mode',
       'password1',
       'password2',
-      'linkSecret',
       'sellerName',
       'sellerInn',
     ])
@@ -94,8 +91,7 @@ export class PaymentConfigService {
     if (
       p.password1.length < 16 ||
       p.password2.length < 16 ||
-      p.password1 === p.password2 ||
-      !/^[a-f0-9]{64}$/.test(p.linkSecret)
+      p.password1 === p.password2
     )
       throw invalid();
     if (
@@ -123,26 +119,8 @@ export class PaymentConfigService {
       throw unavailable();
     return account;
   }
-  accessToken(invoice: PaymentInvoice) {
-    return createHmac('sha256', this.forInvoice(invoice).linkSecret)
-      .update('stitches-payment-access:' + invoice.id)
-      .digest('hex');
-  }
-  acceptsToken(invoice: PaymentInvoice, token?: string) {
-    if (!token || !/^[a-f0-9]{64}$/.test(token)) return false;
-    return timingSafeEqual(
-      Buffer.from(token, 'hex'),
-      Buffer.from(this.accessToken(invoice), 'hex'),
-    );
-  }
   paymentUrl(invoice: PaymentInvoice) {
-    return (
-      this.frontend.replace(/\/$/, '') +
-      '/payment/' +
-      invoice.id +
-      '#token=' +
-      this.accessToken(invoice)
-    );
+    return this.frontend.replace(/\/$/, '') + '/payment/' + invoice.id;
   }
   publicConfig() {
     const account = this.accounts.find((a) => a.id === this.activeId);

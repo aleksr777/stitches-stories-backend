@@ -99,8 +99,8 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
   it('commits one request when identical submissions arrive concurrently', async () => {
     const data = requestData();
     const [first, second] = await Promise.all([
-      shop.createRequest(data, null),
-      shop.createRequest(data, null),
+      shop.createRequest(data, fixture.user.id),
+      shop.createRequest(data, fixture.user.id),
     ]);
     expect(first.id).toBe(second.id);
     expect(first.subtotalRub).toBe(1200);
@@ -110,7 +110,10 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
         .countBy({ requestKey: data.requestKey }),
     ).toBe(1);
     await expect(
-      shop.createRequest({ ...data, name: 'Другой покупатель' }, null),
+      shop.createRequest(
+        { ...data, name: 'Другой покупатель' },
+        fixture.user.id,
+      ),
     ).rejects.toBeInstanceOf(ConflictException);
   });
   it('rejects stale prices, unavailable quantities and duplicate product IDs', async () => {
@@ -118,19 +121,19 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
     await expect(
       shop.createRequest(
         { ...data, items: [{ ...data.items[0], expectedPriceRub: 1 }] },
-        null,
+        fixture.user.id,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
     await expect(
       shop.createRequest(
         { ...data, items: [{ ...data.items[0], quantity: 3 }] },
-        null,
+        fixture.user.id,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
     await expect(
       shop.createRequest(
         { ...data, items: [data.items[0], data.items[0]] },
-        null,
+        fixture.user.id,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(
@@ -139,11 +142,14 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
         .countBy({ requestKey: data.requestKey }),
     ).toBe(0);
   });
-  it('keeps requests separate from other users and guest contact addresses', async () => {
+  it('requires a signed-in customer and keeps requests separate between accounts', async () => {
+    await expect(shop.createRequest(requestData(), 0)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
     await shop.createRequest(requestData(), fixture.user.id);
-    await shop.createRequest(requestData(), null);
+    await shop.createRequest(requestData(), fixture.user.id + 10000);
     expect(await shop.requests(fixture.user.id)).toHaveLength(1);
-    expect(await shop.requests(fixture.user.id + 10000)).toHaveLength(0);
+    expect(await shop.requests(fixture.user.id + 10000)).toHaveLength(1);
   });
   it('rejects customer actions for the shop owner', async () => {
     const data = requestData();

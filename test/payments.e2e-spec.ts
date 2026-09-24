@@ -33,7 +33,7 @@ const url = process.env.TEST_DATABASE_URL;
     config = new PaymentConfigService();
     payments = new PaymentService(db, config, legal);
   };
-  const createOrder = async (userId: number | null = null) => {
+  const createOrder = async (userId: number | null = customer.id) => {
     const product = await db.getRepository(Product).save({
       slug: randomUUID(),
       name: 'Вышитое панно',
@@ -75,10 +75,9 @@ const url = process.env.TEST_DATABASE_URL;
     payments.start(
       invoice.id,
       {
-        accessToken: config.accessToken(invoice),
         documents: invoice.documents,
       },
-      undefined,
+      customer,
     );
   const issued = async (order: OrderRequest) => {
     const view = await payments.issue(order.id, terms);
@@ -139,44 +138,24 @@ const url = process.env.TEST_DATABASE_URL;
       .findOneByOrFail({ id: views[0].id });
     await expect(start(invoice)).rejects.toBeInstanceOf(ConflictException);
   });
-  it('allows only the owning customer or a valid guest capability and never returns contact details', async () => {
-    const { order } = await createOrder(customer.id);
+  it('allows only the owning signed-in customer and never returns contact details', async () => {
+    const { order } = await createOrder();
     const invoice = await issued(order);
     await expect(
-      payments.view(invoice.id, {}, undefined),
+      payments.view(invoice.id, { ...customer, id: 999 }),
     ).rejects.toBeInstanceOf(NotFoundException);
     await expect(
-      payments.view(invoice.id, {}, { ...customer, id: 999 }),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(
-      payments.view(
-        invoice.id,
-        { accessToken: config.accessToken(invoice) },
-        { ...customer, role: Role.ADMIN },
-      ),
+      payments.view(invoice.id, { ...customer, role: Role.ADMIN }),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    const view = await payments.view(invoice.id, {}, customer);
+    const view = await payments.view(invoice.id, customer);
     expect(view.amountRub).toBe(1500);
     expect(JSON.stringify(view)).not.toContain(order.email);
     expect(JSON.stringify(view)).not.toContain(order.name);
-    expect(
-      (
-        await payments.view(
-          invoice.id,
-          { accessToken: config.accessToken(invoice) },
-          undefined,
-        )
-      ).id,
-    ).toBe(invoice.id);
   });
   it('requires exact archived terms and stores one acceptance while reusing the same payment number', async () => {
     const invoice = await issued((await createOrder()).order);
     await expect(
-      payments.start(
-        invoice.id,
-        { accessToken: config.accessToken(invoice), documents: [] },
-        undefined,
-      ),
+      payments.start(invoice.id, { documents: [] }, customer),
     ).rejects.toBeInstanceOf(ConflictException);
     const forms = await Promise.all([start(invoice), start(invoice)]);
     expect(forms[0]).toEqual(forms[1]);
@@ -258,6 +237,11 @@ const url = process.env.TEST_DATABASE_URL;
     await expect(issued((await createOrder()).order)).rejects.toBeInstanceOf(
       ConflictException,
     );
+  });
+  it('does not create an invoice for a legacy request without an account', async () => {
+    await expect(
+      issued((await createOrder(null)).order),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
   it('rejects an order with zero product total before creating an invoice', async () => {
     const { order } = await createOrder();

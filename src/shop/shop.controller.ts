@@ -30,11 +30,7 @@ import {
 } from './shop.dto';
 import { ShopService } from './shop.service';
 import { SubscriptionService } from './subscription.service';
-import {
-  CustomerOnlyGuard,
-  OptionalJwtGuard,
-  ShopWriteGuard,
-} from './shop.guards';
+import { CustomerOnlyGuard, ShopWriteGuard } from './shop.guards';
 import {
   ProductFilesInterceptor,
   ProductImageUpload,
@@ -85,10 +81,10 @@ export class ShopController {
     sendProductImage(await this.shop.image(id), response);
   }
   @Post('requests')
-  @UseGuards(OptionalJwtGuard, CustomerOnlyGuard, ShopWriteGuard)
+  @UseGuards(JwtAuthGuard, CustomerOnlyGuard, ShopWriteGuard)
   request(@Body() dto: CreateRequestDto, @Req() req: Request) {
-    const user = req.user as User | undefined;
-    return this.shop.createRequest(dto, user?.id ?? null, user?.role);
+    const user = req.user as User;
+    return this.shop.createRequest(dto, user.id, user.role);
   }
   @Get('me/requests')
   @UseGuards(JwtAuthGuard, CustomerOnlyGuard)

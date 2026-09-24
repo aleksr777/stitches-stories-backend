@@ -11,11 +11,7 @@ import { canonical, LegalService } from '../../legal/legal.service';
 import type { DocumentRef } from '../../legal/legal.types';
 import { OrderRequest } from '../shop.entities';
 import { PaymentConfigService, unavailable } from './payment-config.service';
-import {
-  IssuePaymentDto,
-  PaymentAccessDto,
-  StartPaymentDto,
-} from './payment.dto';
+import { IssuePaymentDto, StartPaymentDto } from './payment.dto';
 import { PaymentInvoice } from './payment.entity';
 import { expireInvoice, reserveStock } from './payment-stock';
 import {
@@ -24,7 +20,7 @@ import {
   verifyNotification,
 } from './robokassa';
 
-type Viewer = { id: number; role: Role } | undefined;
+type Viewer = { id: number; role: Role };
 const ref = ({ id, version, sha256 }: DocumentRef) => ({ id, version, sha256 });
 
 @Injectable()
@@ -55,6 +51,10 @@ export class PaymentService {
       }
       if (order.status !== 'agreed')
         throw new ConflictException('Сначала согласуйте заявку с покупателем.');
+      if (!order.userId)
+        throw new ConflictException(
+          'Счёт можно выставить только для заявки покупателя из его аккаунта.',
+        );
       const account = this.config.active();
       const documents = ['offer', 'payment', 'returns', 'seller'].map((id) =>
         this.legal.get(id),
@@ -125,34 +125,26 @@ export class PaymentService {
     };
   }
 
-  async view(id: string, access: PaymentAccessDto, viewer: Viewer) {
-    const invoice = await this.authorized(id, access, viewer);
+  async view(id: string, viewer: Viewer) {
+    const invoice = await this.authorized(id, viewer);
     await this.expire(invoice.id);
     return this.snapshot(
       await this.db.getRepository(PaymentInvoice).findOneByOrFail({ id }),
     );
   }
 
-  private async authorized(
-    id: string,
-    access: PaymentAccessDto,
-    viewer: Viewer,
-  ) {
-    if (viewer?.role === Role.ADMIN) throw new ForbiddenException();
+  private async authorized(id: string, viewer: Viewer) {
+    if (viewer.role === Role.ADMIN) throw new ForbiddenException();
     const invoice = await this.db
       .getRepository(PaymentInvoice)
       .findOne({ where: { id }, relations: { order: true } });
-    if (
-      !invoice ||
-      (!(viewer && invoice.order.userId === viewer.id) &&
-        !this.config.acceptsToken(invoice, access.accessToken))
-    )
-      throw new NotFoundException('Счёт не найден или ссылка недействительна.');
+    if (!invoice || invoice.order.userId !== viewer.id)
+      throw new NotFoundException('Счёт не найден.');
     return invoice;
   }
 
   async start(id: string, dto: StartPaymentDto, viewer: Viewer) {
-    await this.authorized(id, dto, viewer);
+    await this.authorized(id, viewer);
     if (!this.config.enabled) throw unavailable();
     // Persist expiration before throwing; throwing inside the transaction would roll it back.
     await this.expire(id);
@@ -185,7 +177,7 @@ export class PaymentService {
       const account = this.config.forInvoice(invoice);
       if (!invoice.acceptedAt) {
         invoice.acceptedAt = new Date();
-        invoice.acceptedByUserId = viewer?.id ?? null;
+        invoice.acceptedByUserId = viewer.id;
         invoice.acceptedDocuments = accepted;
       }
       invoice.status = 'pending';

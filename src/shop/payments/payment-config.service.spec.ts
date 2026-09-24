@@ -30,7 +30,6 @@ describe('Payment account configuration', () => {
       ...testAccount,
       id: 'second-test',
       merchantLogin: 'other',
-      linkSecret: 'd'.repeat(64),
       sellerName: 'Другой продавец',
     };
     process.env.ROBOKASSA_ACCOUNTS_JSON = JSON.stringify([testAccount, second]);
@@ -39,10 +38,7 @@ describe('Payment account configuration', () => {
     const invoice = paymentFixture();
     expect(config.active().id).toBe(second.id);
     expect(config.forInvoice(invoice)).toEqual(testAccount);
-    const token = config.accessToken(invoice);
-    expect(config.acceptsToken(invoice, token)).toBe(true);
-    expect(config.acceptsToken({ ...invoice, id: 'other' }, token)).toBe(false);
-    expect(config.paymentUrl(invoice)).toContain('#token=');
+    expect(config.paymentUrl(invoice)).toContain('/payment/' + invoice.id);
     expect(JSON.stringify(config.publicConfig())).not.toContain(
       second.password1,
     );

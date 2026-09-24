@@ -16,17 +16,9 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/types/role.enum';
 import { User } from '../../users/entities/user.entity';
-import {
-  CustomerOnlyGuard,
-  OptionalJwtGuard,
-  ShopWriteGuard,
-} from '../shop.guards';
+import { CustomerOnlyGuard, ShopWriteGuard } from '../shop.guards';
 import { PaymentConfigService } from './payment-config.service';
-import {
-  IssuePaymentDto,
-  PaymentAccessDto,
-  StartPaymentDto,
-} from './payment.dto';
+import { IssuePaymentDto, StartPaymentDto } from './payment.dto';
 import { PaymentService } from './payment.service';
 
 @Controller('shop/payments')
@@ -43,24 +35,20 @@ export class PaymentController {
   @Post(':id/view')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
-  @UseGuards(OptionalJwtGuard, CustomerOnlyGuard)
-  view(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: PaymentAccessDto,
-    @Req() req: Request,
-  ) {
-    return this.payments.view(id, dto, req.user as User | undefined);
+  @UseGuards(JwtAuthGuard, CustomerOnlyGuard)
+  view(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.payments.view(id, req.user as User);
   }
   @Post(':id/start')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
-  @UseGuards(OptionalJwtGuard, CustomerOnlyGuard, ShopWriteGuard)
+  @UseGuards(JwtAuthGuard, CustomerOnlyGuard, ShopWriteGuard)
   start(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: StartPaymentDto,
     @Req() req: Request,
   ) {
-    return this.payments.start(id, dto, req.user as User | undefined);
+    return this.payments.start(id, dto, req.user as User);
   }
 }
 
