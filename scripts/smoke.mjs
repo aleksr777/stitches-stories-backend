@@ -37,10 +37,10 @@ function extractConfirmationCode(message) {
   return text.match(/\b\d{6}\b/)?.[0] ?? null;
 }
 
-async function readAdminConfirmationCode(email) {
+async function readConfirmationCode(email, subject) {
   assert(
     isLocalMailpit(),
-    'Smoke-проверка входа владельца требует локальный Mailpit. Не используйте её с внешним SMTP.',
+    'Smoke-проверка кодов подтверждения требует локальный Mailpit. Не используйте её с внешним SMTP.',
   );
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
@@ -56,9 +56,7 @@ async function readAdminConfirmationCode(email) {
         for (const message of messages) {
           if (
             !messageHasRecipient(message, email) ||
-            !String(message.Subject ?? message.subject ?? '').includes(
-              'Подтвердите вход владельца',
-            )
+            !String(message.Subject ?? message.subject ?? '').includes(subject)
           )
             continue;
           const code = extractConfirmationCode(message);
@@ -80,9 +78,11 @@ async function readAdminConfirmationCode(email) {
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  assert.fail(
-    'Код подтверждения входа владельца не поступил в локальный Mailpit.',
-  );
+  assert.fail(`Письмо «${subject}» не поступило в локальный Mailpit.`);
+}
+
+async function readAdminConfirmationCode(email) {
+  return readConfirmationCode(email, 'Подтвердите вход владельца');
 }
 
 let ready = false;
@@ -144,6 +144,10 @@ assert.equal(
 );
 const p = products[0];
 const offer = docs.find((d) => d.id === 'offer');
+const accountDocuments = docs
+  .filter((document) => ['pd-account', 'account-terms'].includes(document.id))
+  .map(({ id, version, sha256 }) => ({ id, version, sha256 }));
+assert.equal(accountDocuments.length, 2);
 const body = {
   requestKey: randomUUID(),
   name: 'Тестовая заявка',
@@ -152,18 +156,43 @@ const body = {
   items: [{ productId: p.id, quantity: 1, expectedPriceRub: p.priceRub }],
   document: { id: offer.id, version: offer.version, sha256: offer.sha256 },
 };
+assert.equal((await request('/shop/requests', body)).status, 401);
+
+const customerEmail = `smoke-customer-${randomUUID()}@example.test`;
+const registration = await request('/auth/registration/request', {
+  name: 'Тестовый покупатель',
+  email: customerEmail,
+  password: 'smoke-only-password',
+  documents: accountDocuments,
+});
+assert.equal(registration.status, 201);
+const customerConfirmationCode = await readConfirmationCode(
+  customerEmail,
+  'Confirm registration',
+);
+const confirmedRegistration = await request('/auth/registration/confirm', {
+  email: customerEmail,
+  code: customerConfirmationCode,
+});
+assert.equal(confirmedRegistration.status, 201);
+assert.equal(typeof confirmedRegistration.data.access_token, 'string');
+
 const [first, second] = await Promise.all([
-  request('/shop/requests', body),
-  request('/shop/requests', body),
+  request('/shop/requests', body, confirmedRegistration.data.access_token),
+  request('/shop/requests', body, confirmedRegistration.data.access_token),
 ]);
 assert.equal(first.status, 201);
 assert.equal(second.status, 201);
 assert.equal(first.data.id, second.data.id);
-const badPrice = await request('/shop/requests', {
-  ...body,
-  requestKey: randomUUID(),
-  items: [{ ...body.items[0], expectedPriceRub: p.priceRub + 1 }],
-});
+const badPrice = await request(
+  '/shop/requests',
+  {
+    ...body,
+    requestKey: randomUUID(),
+    items: [{ ...body.items[0], expectedPriceRub: p.priceRub + 1 }],
+  },
+  confirmedRegistration.data.access_token,
+);
 assert.equal(badPrice.status, 409);
 const login = await request('/auth/login', {
   email: process.env.INITIAL_ADMIN_EMAIL,
