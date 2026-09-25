@@ -21,6 +21,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { AcceptanceDto, DocumentRefDto } from '../legal/legal.dto';
+import { DeliveryAddressDto } from './delivery-address.dto';
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 const email = ({ value }: { value: unknown }) =>
@@ -36,6 +37,12 @@ export class CreateRequestDto {
   @Transform(email) @IsEmail() @MaxLength(255) email!: string;
   @IsOptional() @Matches(/^[+\d ()-]{6,30}$/) phone?: string;
   @Transform(trim) @IsString() @Length(2, 150) city!: string;
+  @IsOptional() @IsUUID() addressId?: string;
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DeliveryAddressDto)
+  deliveryAddress?: DeliveryAddressDto;
+  @IsOptional() @IsBoolean() saveAddress?: boolean;
   @IsOptional() @IsString() @MaxLength(1500) comment?: string;
   @IsArray()
   @ArrayMinSize(1)

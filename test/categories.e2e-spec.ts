@@ -13,6 +13,7 @@ import { CategoryService } from '../src/shop/category.service';
 import { Product, shopEntities } from '../src/shop/shop.entities';
 import { ProductDto } from '../src/shop/shop.dto';
 import { ShopService } from '../src/shop/shop.service';
+import { User } from '../src/users/entities/user.entity';
 
 const url = process.env.TEST_DATABASE_URL;
 (url ? describe : describe.skip)(
@@ -48,7 +49,7 @@ const url = process.env.TEST_DATABASE_URL;
         type: 'postgres',
         url,
         schema,
-        entities: shopEntities,
+        entities: [User, ...shopEntities],
         synchronize: false,
       }).initialize();
       runner = db.createQueryRunner();

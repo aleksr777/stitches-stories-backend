@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
@@ -29,6 +30,7 @@ import {
 } from './helpers/credential-fixture';
 import { Role } from '../src/common/types/role.enum';
 import { ProductCategory } from '../src/shop/category.entity';
+import { DeliveryAddressService } from '../src/shop/delivery-address.service';
 
 const url = process.env.TEST_DATABASE_URL;
 const databaseTests = url ? describe : describe.skip;
@@ -38,6 +40,7 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
   let db: DataSource;
   let legal: LegalService;
   let shop: ShopService;
+  let addresses: DeliveryAddressService;
   let product: Product;
   let fixture: Awaited<ReturnType<typeof createCredentialFixture>>;
   const requestData = (): CreateRequestDto => ({
@@ -67,6 +70,7 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
     legal = new LegalService(db);
     await legal.onModuleInit();
     shop = new ShopService(db, legal);
+    addresses = new DeliveryAddressService(db);
     await db
       .getRepository(ProductCategory)
       .insert({ id: 'covers', name: 'Обложки', nameKey: 'обложки' });
@@ -115,6 +119,108 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
         fixture.user.id,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+  it('keeps an address snapshot in the request after editing or deleting the saved address', async () => {
+    const details = {
+      region: 'Свердловская область',
+      city: 'Заречный',
+      street: 'Ленина',
+      house: '12 к. 1',
+      apartment: '3',
+      postalCode: '624250',
+    };
+    const saved = await addresses.create(fixture.user.id, details);
+    const request = { ...requestData(), addressId: saved.id };
+    const receipt = await shop.createRequest(request, fixture.user.id);
+    await addresses.update(fixture.user.id, saved.id, {
+      ...details,
+      house: '14',
+    });
+    await addresses.remove(fixture.user.id, saved.id);
+    const order = await db
+      .getRepository(OrderRequest)
+      .findOneByOrFail({ id: receipt.id });
+    expect(order.deliveryAddress).toEqual(details);
+    expect((await shop.createRequest(request, fixture.user.id)).id).toBe(
+      receipt.id,
+    );
+    await expect(
+      shop.createRequest(
+        { ...requestData(), addressId: saved.id },
+        fixture.user.id,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('saves a new checkout address atomically and rejects another customer’s address', async () => {
+    const details = { city: 'Заречный', street: 'Мира', house: '7' };
+    const request = {
+      ...requestData(),
+      deliveryAddress: details,
+      saveAddress: true,
+    };
+    const receipt = await shop.createRequest(request, fixture.user.id);
+    expect(
+      (await addresses.list(fixture.user.id)).map((address) => address.house),
+    ).toEqual(['7']);
+    expect((await shop.createRequest(request, fixture.user.id)).id).toBe(
+      receipt.id,
+    );
+    expect(await addresses.list(fixture.user.id)).toHaveLength(1);
+    const saved = (await addresses.list(fixture.user.id))[0];
+    await expect(
+      addresses.update(fixture.user.id + 1, saved.id, details),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      addresses.remove(fixture.user.id + 1, saved.id),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(await addresses.list(fixture.user.id + 1)).toEqual([]);
+    await expect(
+      shop.createRequest(
+        { ...requestData(), addressId: saved.id },
+        fixture.user.id + 1,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      shop.createRequest(
+        {
+          ...requestData(),
+          deliveryAddress: { ...details, city: 'Другой' },
+          saveAddress: true,
+        },
+        fixture.user.id,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(await addresses.list(fixture.user.id)).toHaveLength(1);
+  });
+
+  it('limits saved addresses to ten under concurrent requests', async () => {
+    const details = { city: 'Заречный', street: 'Мира', house: '7' };
+    for (let i = 0; i < 9; i++)
+      await addresses.create(fixture.user.id, details);
+    const attempts = await Promise.allSettled([
+      addresses.create(fixture.user.id, details),
+      addresses.create(fixture.user.id, details),
+    ]);
+    expect(
+      attempts.filter((attempt) => attempt.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(await addresses.list(fixture.user.id)).toHaveLength(10);
+  });
+
+  it('removes the address book with the account while preserving an existing request snapshot', async () => {
+    const details = { city: 'Заречный', street: 'Мира', house: '7' };
+    await addresses.create(fixture.user.id, details);
+    const receipt = await shop.createRequest(
+      { ...requestData(), deliveryAddress: details },
+      fixture.user.id,
+    );
+    await db.getRepository(User).delete({ id: fixture.user.id });
+    expect(await addresses.list(fixture.user.id)).toEqual([]);
+    expect(
+      (await db.getRepository(OrderRequest).findOneByOrFail({ id: receipt.id }))
+        .deliveryAddress,
+    ).toMatchObject(details);
   });
   it('rejects stale prices, unavailable quantities and duplicate product IDs', async () => {
     const data = requestData();

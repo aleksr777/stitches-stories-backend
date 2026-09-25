@@ -105,4 +105,33 @@ describe('Purchase request HTTP access', () => {
       'user',
     );
   });
+
+  it('validates nested delivery details and rejects extra address fields', async () => {
+    for (const deliveryAddress of [
+      { city: 'Заречный', street: '', house: '12' },
+      { city: 'Заречный', street: 'Ленина', house: '12', postalCode: '12345' },
+      { city: 'Заречный', street: 'Ленина', house: '12', userId: 99 },
+    ]) {
+      await request(app.getHttpServer() as Server)
+        .post('/api/shop/requests')
+        .set('Authorization', 'Bearer customer')
+        .send({ ...body, deliveryAddress })
+        .expect(400);
+    }
+    expect(shop.createRequest).not.toHaveBeenCalled();
+    await request(app.getHttpServer() as Server)
+      .post('/api/shop/requests')
+      .set('Authorization', 'Bearer customer')
+      .send({
+        ...body,
+        deliveryAddress: { city: 'Заречный', street: 'Ленина', house: '12' },
+        saveAddress: true,
+      })
+      .expect(201);
+    expect(shop.createRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ saveAddress: true }),
+      123,
+      'user',
+    );
+  });
 });

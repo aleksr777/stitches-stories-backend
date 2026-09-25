@@ -17,6 +17,7 @@ import { ShopService } from '../src/shop/shop.service';
 import { ProductDto } from '../src/shop/shop.dto';
 import { LegalService } from '../src/legal/legal.service';
 import { ProductCategory } from '../src/shop/category.entity';
+import { User } from '../src/users/entities/user.entity';
 
 const url = process.env.TEST_DATABASE_URL;
 (url ? describe : describe.skip)('Product images in PostgreSQL', () => {
@@ -47,7 +48,7 @@ const url = process.env.TEST_DATABASE_URL;
       type: 'postgres',
       url,
       schema,
-      entities: shopEntities,
+      entities: [User, ...shopEntities],
       synchronize: true,
     }).initialize();
     shop = new ShopService(db, {} as LegalService);

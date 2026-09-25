@@ -12,6 +12,10 @@ import {
 import { DocumentRef } from '../legal/legal.types';
 import { ProductCategory } from './category.entity';
 import { PaymentInvoice } from './payments/payment.entity';
+import {
+  DeliveryAddress,
+  DeliveryAddressDetails,
+} from './delivery-address.entity';
 @Entity('product')
 @Index('IDX_product_category', ['category'])
 export class Product {
@@ -79,6 +83,8 @@ export class OrderRequest {
     | string
     | null;
   @Column({ type: 'varchar', length: 150 }) city!: string;
+  @Column({ type: 'jsonb', nullable: true })
+  deliveryAddress!: DeliveryAddressDetails | null;
   @Column({ type: 'varchar', length: 1500, default: '' }) comment!: string;
   @Column({ type: 'jsonb' }) items!: OrderLine[];
   @Column({ type: 'int' }) subtotalRub!: number;
@@ -111,6 +117,7 @@ export class Subscription {
 }
 export const shopEntities = [
   PaymentInvoice,
+  DeliveryAddress,
   ProductCategory,
   Product,
   ProductImage,

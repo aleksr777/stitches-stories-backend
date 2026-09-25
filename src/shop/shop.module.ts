@@ -5,6 +5,8 @@ import { LegalModule } from '../legal/legal.module';
 import { shopEntities } from './shop.entities';
 import { ShopController, ShopAdminController } from './shop.controller';
 import { ShopService } from './shop.service';
+import { DeliveryAddressService } from './delivery-address.service';
+import { DeliveryAddressController } from './delivery-address.controller';
 import { SubscriptionService } from './subscription.service';
 import {
   AdminCategoriesController,
@@ -29,6 +31,7 @@ import {
     PaymentController,
     AdminPaymentController,
     ShopController,
+    DeliveryAddressController,
     ShopAdminController,
     CategoriesController,
     AdminCategoriesController,
@@ -38,6 +41,7 @@ import {
     PaymentService,
     PaymentMaintenanceService,
     ShopService,
+    DeliveryAddressService,
     CategoryService,
     SubscriptionService,
     ShopWriteGuard,

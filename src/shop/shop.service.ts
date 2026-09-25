@@ -14,6 +14,9 @@ import { CreateRequestDto, ProductDto } from './shop.dto';
 import { Favorite, OrderRequest, Product, ProductImage } from './shop.entities';
 import { ProductCategory } from './category.entity';
 import { PaymentInvoice } from './payments/payment.entity';
+import { DeliveryAddress } from './delivery-address.entity';
+import { addressDetails } from './delivery-address.dto';
+import { saveDeliveryAddress } from './delivery-address.service';
 import {
   MAX_PRODUCT_IMAGES,
   ProductImageUpload,
@@ -80,6 +83,10 @@ export class ShopService {
       throw new ForbiddenException(
         'Владелец магазина не может отправлять заявки на покупку.',
       );
+    if (dto.addressId && dto.deliveryAddress)
+      throw new BadRequestException('Выберите сохранённый или новый адрес.');
+    if (dto.saveAddress && !dto.deliveryAddress)
+      throw new BadRequestException('Укажите новый адрес для сохранения.');
     this.legal.assertReferences([dto.document], ['offer']);
     if (new Set(dto.items.map((i) => i.productId)).size !== dto.items.length)
       throw new BadRequestException('В запросе повторяются изделия.');
@@ -103,6 +110,23 @@ export class ShopService {
     if (existing) return replay(existing);
     try {
       return await this.db.transaction(async (m) => {
+        let deliveryAddress = null;
+        if (dto.addressId) {
+          const savedAddress = await m
+            .getRepository(DeliveryAddress)
+            .findOneBy({
+              id: dto.addressId,
+              userId,
+            });
+          if (!savedAddress) throw new NotFoundException('Адрес не найден.');
+          deliveryAddress = addressDetails(savedAddress);
+        } else if (dto.deliveryAddress) {
+          deliveryAddress = addressDetails(dto.deliveryAddress);
+        }
+        if (deliveryAddress && dto.city.trim() !== deliveryAddress.city)
+          throw new BadRequestException(
+            'Город в заявке не совпадает с адресом.',
+          );
         const products = await m
           .getRepository(Product)
           .createQueryBuilder('p')
@@ -137,11 +161,16 @@ export class ShopService {
         const order = await m.save(
           OrderRequest,
           m.create(OrderRequest, {
-            ...dto,
+            requestKey: dto.requestKey,
             userId,
+            name: dto.name,
+            email: dto.email,
             phone: dto.phone ?? null,
+            city: dto.city,
+            deliveryAddress,
             comment: dto.comment ?? '',
             items,
+            document: dto.document,
             payloadHash,
             subtotalRub: items.reduce(
               (sum, i) => sum + i.priceRub * i.quantity,
@@ -149,6 +178,8 @@ export class ShopService {
             ),
           }),
         );
+        if (dto.saveAddress && dto.deliveryAddress)
+          await saveDeliveryAddress(m, userId, dto.deliveryAddress);
         return this.receipt(order);
       });
     } catch (err) {

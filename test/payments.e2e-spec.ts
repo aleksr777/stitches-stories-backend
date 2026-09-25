@@ -14,6 +14,7 @@ import { PaymentConfigService } from '../src/shop/payments/payment-config.servic
 import { PaymentInvoice } from '../src/shop/payments/payment.entity';
 import { PaymentService } from '../src/shop/payments/payment.service';
 import { notification, testAccount } from './helpers/payment-fixture';
+import { User } from '../src/users/entities/user.entity';
 
 const url = process.env.TEST_DATABASE_URL;
 (url ? describe : describe.skip)('SBP invoices in PostgreSQL', () => {
@@ -90,7 +91,7 @@ const url = process.env.TEST_DATABASE_URL;
       type: 'postgres',
       url,
       schema,
-      entities: [...shopEntities, LegalDocumentEntity, ConsentEvent],
+      entities: [User, ...shopEntities, LegalDocumentEntity, ConsentEvent],
       synchronize: true,
     }).initialize();
     legal = new LegalService(db);
