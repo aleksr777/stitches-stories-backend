@@ -158,10 +158,6 @@ export class TokensService {
     return this.getVerificationAttemptConfig(tokenType).maxAttempts;
   }
 
-  getVerificationResendCooldown() {
-    return this.verificationResendCooldown;
-  }
-
   async reserveVerificationCodeRequest(tokenType: TokenType, subject: string) {
     const key = this.getVerificationResendKey(tokenType, subject);
     const result = await this.redisService.set(key, '1', {
@@ -292,13 +288,6 @@ export class TokensService {
     return data ? { code: activeCode, data } : null;
   }
 
-  async isActiveRegistrationCode(email: string, code: string) {
-    const activeCode = await this.redisService.get(
-      this.getRegistrationActiveKey(email),
-    );
-    return activeCode === code;
-  }
-
   async getDataByRegistrationCode(
     code: string,
   ): Promise<{ email: string; password: string } | null> {
@@ -338,13 +327,6 @@ export class TokensService {
       await this.redisService.del(`${RESET_REDIS_PREFIX}${previousCode}`);
     }
     return code;
-  }
-
-  async isActiveResetCode(userId: number, code: string) {
-    const activeCode = await this.redisService.get(
-      this.getResetActiveKey(userId),
-    );
-    return activeCode === code;
   }
 
   async getIdByResetCode(code: string): Promise<number | null> {
@@ -447,10 +429,6 @@ export class TokensService {
     return JSON.parse(raw) as EmailChangePayload;
   }
 
-  async deleteEmailChangeCode(code: string) {
-    await this.redisService.del(`${EMAIL_CHANGE_REDIS_PREFIX}${code}`);
-  }
-
   async getPasswordChangeCode(userId: number) {
     if (!userId) this.errorsService.default(null, ErrMsg.USER_ID_NOT_DEFINED);
     const code = await this.saveVerificationToken(
@@ -484,13 +462,5 @@ export class TokensService {
     );
     const consumedUserId = this.parseUserId(raw);
     return consumedUserId === userId ? consumedUserId : null;
-  }
-
-  async deletePasswordChangeCode(code: string, userId?: number) {
-    await this.redisService.del(`${PASSWORD_CHANGE_PREFIX}${code}`);
-    if (!userId) return;
-    const activeKey = this.getPasswordChangeActiveKey(userId);
-    const activeCode = await this.redisService.get(activeKey);
-    if (activeCode === code) await this.redisService.del(activeKey);
   }
 }
