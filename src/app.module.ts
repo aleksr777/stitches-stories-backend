@@ -1,4 +1,5 @@
 import { ShopModule } from './shop/shop.module';
+import { SocialIdentity } from './auth/entities/social-identity.entity';
 import { LegalModule } from './legal/legal.module';
 import { shopEntities } from './shop/shop.entities';
 import { LegalDocumentEntity, ConsentEvent } from './legal/legal.entities';
@@ -34,6 +35,7 @@ import { UsersModule } from './users/users.module';
         username: envService.get('DB_USERNAME'),
         password: envService.get('DB_PASSWORD'),
         entities: [
+          SocialIdentity,
           User,
           AuthSession,
           SecurityAuditEvent,

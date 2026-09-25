@@ -1,4 +1,8 @@
 import { LegalModule } from '../legal/legal.module';
+import { SocialController } from './social/social.controller';
+import { SocialProviderService } from './social/social-provider.service';
+import { SocialFlowService } from './social/social-flow.service';
+import { SocialAccountService } from './social/social-account.service';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -45,6 +49,9 @@ import { TokensService } from './tokens.service';
     }),
   ],
   providers: [
+    SocialProviderService,
+    SocialFlowService,
+    SocialAccountService,
     AuthService,
     AdminLoginService,
     RegistrationService,
@@ -61,7 +68,7 @@ import { TokensService } from './tokens.service';
     JwtRefreshStrategy,
     TokensService,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, SocialController],
   exports: [AuthService, TokensService],
 })
 export class AuthModule {}

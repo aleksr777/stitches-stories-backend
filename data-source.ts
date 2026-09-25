@@ -1,4 +1,5 @@
 import { shopEntities } from './src/shop/shop.entities';
+import { SocialIdentity } from './src/auth/entities/social-identity.entity';
 import { LegalDocumentEntity, ConsentEvent } from './src/legal/legal.entities';
 import * as dotenv from 'dotenv';
 dotenv.config();
@@ -23,6 +24,7 @@ const dataSource = new DataSource({
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,
   entities: [
+    SocialIdentity,
     User,
     AuthSession,
     SecurityAuditEvent,

@@ -14,4 +14,5 @@ export type RegistrationPayload = {
   email: string;
   password: string;
   registration?: RegistrationDetails;
+  socialIdentity?: import('../auth/entities/social-identity.entity').SocialIdentityRef;
 };

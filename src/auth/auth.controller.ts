@@ -75,6 +75,18 @@ export class AuthController {
 
   private clearRefreshCookie(res: Response): void {
     res.clearCookie('refresh_token', this.getRefreshCookieOptions());
+    this.clearSocialCookies(res);
+  }
+
+  private clearSocialCookies(res: Response): void {
+    for (const name of ['social_pending', 'social_binding']) {
+      res.clearCookie(name, {
+        httpOnly: true,
+        secure: this.securityConfig.getRefreshCookieSecure(),
+        sameSite: 'lax',
+        path: '/api/auth/social',
+      });
+    }
   }
 
   private getAuthResponse(tokens: JwtTokens): AuthResponse {
