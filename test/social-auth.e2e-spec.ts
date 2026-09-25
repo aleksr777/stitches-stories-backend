@@ -173,7 +173,13 @@ const url = process.env.TEST_DATABASE_URL;
       expect((await accounts.login(identity)).id).toBe(user.id);
       expect(
         await fixture.usersController.getCurrentProfile({ user } as never),
-      ).toMatchObject(updated as object);
+      ).toMatchObject({
+        email: null,
+        name: 'Надежда Иванова',
+        contact_email: 'new@example.test',
+        phone_number: null,
+        sex: null,
+      });
       expect((await accounts.find(identity))?.userId).toBe(user.id);
     });
     it('does not merge identities, enforces blocking and owner restrictions, and cascades deletion', async () => {
