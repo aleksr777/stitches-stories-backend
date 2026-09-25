@@ -62,7 +62,6 @@ jobs:
       TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/app_test
       INITIAL_ADMIN_EMAIL: admin@example.com
       INITIAL_ADMIN_PASSWORD: ReleaseAuditPassword123!
-      INITIAL_ADMIN_NICKNAME: admin
       SMTP_HOST: 127.0.0.1
       SMTP_PORT: 1025
       SMTP_SECURE: false

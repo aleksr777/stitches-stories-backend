@@ -28,7 +28,6 @@ describe('administrator account actions', () => {
             : {
                 id: 2,
                 email: 'user@example.test',
-                nickname: 'Покупатель',
                 role: Role.USER,
                 is_blocked: false,
               },

@@ -1,6 +1,6 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Not, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { AuthService } from '../auth/auth.service';
 import { HashService } from '../common/hash-service/hash.service';
 import { ErrorsService } from '../common/errors-service/errors.service';
@@ -10,15 +10,11 @@ import {
   ID,
   ROLE,
   PASSWORD,
-  USER_PUBLIC_FIELDS,
   USER_PROFILE_FIELDS,
   USER_SECRET_FIELDS,
-  USER_CONFIDENTIAL_FIELDS,
   SPECIAL_UPDATE_FIELDS,
-  USER_UNIQUE_FIELDS,
 } from '../common/constants/user-select-fields.constants';
 import { specialUpdateFields } from '../common/types/special-update-fields.type';
-import { userUniqueFields } from '../common/types/user-unique-fields.type';
 import { Role } from '../common/types/role.enum';
 import { ErrMsg } from '../common/errors-service/error-messages.type';
 import { PublicUser } from '../common/types/user-secret-key.type';
@@ -82,35 +78,9 @@ export class UsersService {
     }
   }
 
-  async getUsersQuery(limit: number, offset: number, nickname?: string) {
-    try {
-      if (limit <= 0 || offset < 0) {
-        this.errorsService.badRequest('Invalid pagination parameters');
-      }
-      const query = this.usersRepository
-        .createQueryBuilder('user')
-        .select(USER_PUBLIC_FIELDS.map((f) => `user.${f}`))
-        .take(limit)
-        .skip(offset);
-      if (nickname) {
-        query.where('user.nickname ILIKE :nickname', {
-          nickname: `%${nickname}%`,
-        });
-      }
-      const users = await query.getMany();
-      return this.authService.removeSensitiveInfo(users, [
-        ...USER_SECRET_FIELDS,
-        ...USER_CONFIDENTIAL_FIELDS,
-      ]);
-    } catch (err: unknown) {
-      this.errorsService.default(err);
-    }
-  }
-
   async updatePartialUserData(userId: number, dto: UpdatePartialUserDataDto) {
     const specialFields: string[] = [];
     const emptyFields: string[] = [];
-    const conflictsFields: string[] = [];
     const patch = Object.fromEntries(
       Object.entries(dto).filter(([, value]) => value !== undefined),
     ) as Record<string, unknown>;
@@ -141,15 +111,6 @@ export class UsersService {
     await qr.connect();
     await qr.startTransaction();
     try {
-      for (const key of Object.keys(patch)) {
-        if (USER_UNIQUE_FIELDS.includes(key as userUniqueFields)) {
-          const value = patch[key];
-          const exists = await qr.manager.getRepository(User).exists({
-            where: { [key]: value, id: Not(userId) },
-          });
-          if (exists) conflictsFields.push(key);
-        }
-      }
       const result = await qr.manager
         .createQueryBuilder()
         .update(User)
@@ -174,7 +135,7 @@ export class UsersService {
       await qr.rollbackTransaction();
       if (err instanceof HttpException) throw err;
       this.errorsService.userNotFound(err);
-      this.errorsService.userConflict(err, conflictsFields);
+      this.errorsService.userConflict(err);
       this.errorsService.default(err);
     } finally {
       await qr.release();

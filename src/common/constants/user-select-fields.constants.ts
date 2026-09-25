@@ -1,5 +1,4 @@
 export const ID = 'id';
-export const NICKNAME = 'nickname';
 export const EMAIL = 'email';
 const PHONE_NUMBER = 'phone_number';
 const CONTACT_EMAIL = 'contact_email';
@@ -22,7 +21,6 @@ export const BLOCKED_REASON = 'blocked_reason';
 
 export const USER_SEARCHABLE_FIELDS = [
   NAME,
-  NICKNAME,
   EMAIL,
   CONTACT_EMAIL,
   PHONE_NUMBER,
@@ -35,13 +33,7 @@ const IS_BLOCKED_FIELDS = [
   BLOCKED_REASON,
 ] as const;
 
-export const USER_PUBLIC_FIELDS = [
-  ID,
-  NICKNAME,
-  NAME,
-  AGE,
-  LAST_ACTIVITY_AT,
-] as const;
+export const USER_PUBLIC_FIELDS = [ID, NAME, AGE, LAST_ACTIVITY_AT] as const;
 
 export const USER_CONFIDENTIAL_FIELDS = [
   CREATED_AT,
@@ -64,8 +56,6 @@ export const ADMIN_FIELDS = [
   ...USER_PROFILE_FIELDS,
   ...IS_BLOCKED_FIELDS,
 ] as const;
-
-export const USER_UNIQUE_FIELDS = [NICKNAME, EMAIL /* PHONE_NUMBER */] as const;
 
 export const SPECIAL_UPDATE_FIELDS = [
   ID,

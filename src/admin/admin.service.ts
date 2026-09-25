@@ -22,7 +22,6 @@ import {
   EMAIL,
   PASSWORD,
   IS_BLOCKED,
-  NICKNAME,
   ADMIN_FIELDS,
   USER_SECRET_FIELDS,
 } from '../common/constants/user-select-fields.constants';
@@ -87,7 +86,7 @@ export class AdminService {
         else
           qb.andWhere(
             new Brackets((b) => {
-              b.where('user.nickname ILIKE :q', { q })
+              b.where('user.name ILIKE :q', { q })
                 .orWhere('user.email ILIKE :q', { q })
                 .orWhere('user.contact_email ILIKE :q', { q })
                 .orWhere('user.phone_number ILIKE :q', { q });
@@ -138,7 +137,7 @@ export class AdminService {
 
       const user = await qr.manager.findOneOrFail(User, {
         where: { id: userId },
-        select: [ID, EMAIL, NICKNAME, ROLE],
+        select: [ID, EMAIL, ROLE],
         lock: { mode: 'pessimistic_write' },
       });
       if (user.role === Role.ADMIN) {
@@ -151,11 +150,9 @@ export class AdminService {
         .catch(() => undefined);
       const subject = 'Account deleted by administrator';
       const text =
-        `Hello, ${user.nickname}!\n\n` +
-        `Your account has been permanently deleted by an administrator.\n\n`;
+        'Hello!\n\nYour account has been permanently deleted by an administrator.\n\n';
       const html =
-        `<p>Hello, ${user.nickname}!</p>` +
-        `<p>Your account has been permanently deleted by an administrator.</p>`;
+        '<p>Hello!</p><p>Your account has been permanently deleted by an administrator.</p>';
       if (user.email)
         await this.mailService.send(user.email, subject, text, html);
     } catch (err: unknown) {
@@ -182,14 +179,13 @@ export class AdminService {
     }
     const reason = blocked_reason.trim();
     let email: string | null = null;
-    let nickname: string | null = null;
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
     await qr.startTransaction();
     try {
       const user = await qr.manager.findOneOrFail(User, {
         where: { id: userId },
-        select: [ID, EMAIL, NICKNAME, ROLE, IS_BLOCKED],
+        select: [ID, EMAIL, ROLE, IS_BLOCKED],
         lock: { mode: 'pessimistic_write' },
       });
       if (user.role === Role.ADMIN) {
@@ -219,7 +215,6 @@ export class AdminService {
       );
       await qr.commitTransaction();
       email = user.email;
-      nickname = user.nickname ?? null;
     } catch (err: unknown) {
       if (qr.isTransactionActive) {
         await qr.rollbackTransaction();
@@ -237,12 +232,11 @@ export class AdminService {
       .catch(() => undefined);
     if (email) {
       const subject = 'Account has been blocked.';
-      const greet = nickname ? `Hello, ${nickname}!` : 'Hello!';
       const text =
-        `${greet}\n\nYour account has been blocked by an administrator.` +
+        'Hello!\n\nYour account has been blocked by an administrator.' +
         (reason ? `\nReason: ${reason}` : '');
       const html =
-        `<p>${greet}</p><p>Your account has been blocked by an administrator.</p>` +
+        '<p>Hello!</p><p>Your account has been blocked by an administrator.</p>' +
         (reason ? `<p>Reason: ${reason}</p>` : '');
       await this.mailService.send(email, subject, text, html);
     }
@@ -250,14 +244,13 @@ export class AdminService {
 
   async unblockUserById(userId: number): Promise<void> {
     let email: string | null = null;
-    let nickname: string | null = null;
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
     await qr.startTransaction();
     try {
       const user = await qr.manager.findOneOrFail(User, {
         where: { id: userId },
-        select: [ID, EMAIL, NICKNAME, IS_BLOCKED],
+        select: [ID, EMAIL, IS_BLOCKED],
         lock: { mode: 'pessimistic_write' },
       });
       if (!user.is_blocked) {
@@ -275,7 +268,6 @@ export class AdminService {
       );
       await qr.commitTransaction();
       email = user.email;
-      nickname = user.nickname ?? null;
     } catch (err: unknown) {
       if (qr.isTransactionActive) {
         await qr.rollbackTransaction();
@@ -290,9 +282,10 @@ export class AdminService {
     }
     if (email) {
       const subject = 'Account has been unblocked';
-      const greet = nickname ? `Hello, ${nickname}!` : 'Hello!';
-      const text = `${greet}\n\nYour account has been unblocked by an administrator.`;
-      const html = `<p>${greet}</p><p>Your account has been unblocked by an administrator.</p>`;
+      const text =
+        'Hello!\n\nYour account has been unblocked by an administrator.';
+      const html =
+        '<p>Hello!</p><p>Your account has been unblocked by an administrator.</p>';
       await this.mailService.send(email, subject, text, html);
     }
   }

@@ -9,7 +9,6 @@ import { ErrorsService } from './errors-service/errors.service';
 import { HashService } from './hash-service/hash.service';
 import { RequestLoggingInterceptor } from './logging/request-logging.interceptor';
 import { MailService } from './mail-service/mail.service';
-import { NicknameGeneratorService } from './nickname-generator-service/nickname-generator.service';
 import { ApiRateLimitGuard } from './rate-limit-service/api-rate-limit.guard';
 import { RedisService } from './redis-service/redis.service';
 import { SecurityConfigService } from './security/security-config.service';
@@ -23,7 +22,6 @@ import { SecurityConfigService } from './security/security-config.service';
     ErrorsService,
     EnvService,
     MailService,
-    NicknameGeneratorService,
     SecurityConfigService,
     ApiRateLimitGuard,
     { provide: APP_GUARD, useExisting: ApiRateLimitGuard },
@@ -36,7 +34,6 @@ import { SecurityConfigService } from './security/security-config.service';
     ErrorsService,
     EnvService,
     MailService,
-    NicknameGeneratorService,
     SecurityConfigService,
   ],
 })

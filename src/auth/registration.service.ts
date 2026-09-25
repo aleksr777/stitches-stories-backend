@@ -14,7 +14,6 @@ import { ErrorsService } from '../common/errors-service/errors.service';
 import { MailService } from '../common/mail-service/mail.service';
 import { EnvService } from '../common/env-service/env.service';
 import { RedisService } from '../common/redis-service/redis.service';
-import { NicknameGeneratorService } from '../common/nickname-generator-service/nickname-generator.service';
 import { User } from '../users/entities/user.entity';
 import { ID } from '../common/constants/user-select-fields.constants';
 import { TokenType } from '../common/types/token-type.type';
@@ -43,7 +42,6 @@ export class RegistrationService {
     private readonly mailService: MailService,
     private readonly envService: EnvService,
     private readonly redisService: RedisService,
-    private readonly nicknameGeneratorService: NicknameGeneratorService,
     private readonly legal: LegalService,
   ) {
     this.frontendUrl = this.envService.get('FRONTEND_URL');
@@ -275,24 +273,10 @@ export class RegistrationService {
         'account-terms',
       ]);
       this.mailService.validateNotServiceEmail(data.email);
-      let nickname: string;
-      let attempts = 0;
-      const maxAttempts = 100;
-      do {
-        if (attempts >= maxAttempts) {
-          this.errorsService.default(
-            null,
-            `Unable to generate unique nickname after ${maxAttempts} attempts`,
-          );
-        }
-        nickname = this.nicknameGeneratorService.get();
-        attempts++;
-      } while (await qr.manager.findOne(User, { where: { nickname } }));
       const newUser = qr.manager.create(User, {
         email: data.email,
         password: data.password,
         name: data.registration.name,
-        nickname,
       });
       await qr.manager.save(User, newUser);
       if (data.socialIdentity) {

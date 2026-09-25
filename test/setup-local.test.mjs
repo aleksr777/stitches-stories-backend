@@ -128,7 +128,6 @@ test('external SMTP and initial administrator are preserved while local ports ar
     "SMTP_FROM='synthetic-sender@example.test'",
     "SMTP_PASS='synthetic-mail-password-$-only'",
     "INITIAL_ADMIN_EMAIL='synthetic-owner@example.test'",
-    "INITIAL_ADMIN_NICKNAME='synthetic-owner'",
   ].join('\r\n');
   const original =
     legacy.replace(/^SMTP_(?:HOST|PORT)=[^\r\n]*\r?\n/gm, '') + smtp + '\r\n';

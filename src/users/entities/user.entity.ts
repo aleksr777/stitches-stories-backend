@@ -79,18 +79,6 @@ export class User {
   })
   phone_number?: string | null;
 
-  @IsOptional()
-  @IsString()
-  @Length(2, 50)
-  @Column({
-    type: 'varchar',
-    name: 'nickname',
-    unique: true,
-    nullable: true,
-    length: 50,
-  })
-  nickname?: string | null;
-
   @IsString()
   @Length(12, 100)
   @Column({

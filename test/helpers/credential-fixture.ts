@@ -18,7 +18,6 @@ import { EnvService } from '../../src/common/env-service/env.service';
 import { ErrorsService } from '../../src/common/errors-service/errors.service';
 import { HashService } from '../../src/common/hash-service/hash.service';
 import { MailService } from '../../src/common/mail-service/mail.service';
-import { NicknameGeneratorService } from '../../src/common/nickname-generator-service/nickname-generator.service';
 import { RedisService } from '../../src/common/redis-service/redis.service';
 import { SecurityConfigService } from '../../src/common/security/security-config.service';
 import { EmailChangeService } from '../../src/users/email-change.service';
@@ -147,7 +146,6 @@ export const createCredentialFixture = async (db: DataSource) => {
     mail,
     env,
     redis,
-    { get: () => randomUUID() } as NicknameGeneratorService,
     new LegalService(db),
   );
   const email = new EmailChangeService(
