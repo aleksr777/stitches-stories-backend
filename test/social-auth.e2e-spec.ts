@@ -204,6 +204,8 @@ const url = process.env.TEST_DATABASE_URL;
       ).rejects.toThrow();
       await fixture.usersController.confirmContactEmailChange({ code: CODE }, {
         user,
+        ip: '127.0.0.1',
+        get: () => undefined,
       } as never);
       await expect(
         fixture.usersController.confirmContactEmailChange({ code: CODE }, {
@@ -247,6 +249,8 @@ const url = process.env.TEST_DATABASE_URL;
       ).toHaveProperty('contact_email', 'old@example.test');
       await fixture.usersController.confirmContactEmailChange({ code: CODE }, {
         user,
+        ip: '127.0.0.1',
+        get: () => undefined,
       } as never);
       expect(
         await fixture.usersController.getCurrentProfile({ user } as never),
