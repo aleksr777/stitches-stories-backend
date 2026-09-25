@@ -191,7 +191,7 @@ export class PasswordResetService {
         select: [ID, EMAIL],
         lock: { mode: 'pessimistic_write' },
       });
-      if (!user || user.email.trim().toLowerCase() !== attemptSubject) {
+      if (!user || user.email?.trim().toLowerCase() !== attemptSubject) {
         await this.rejectInvalidCode(attemptSubject);
       }
 

@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -73,6 +73,10 @@ export class PasswordChangeService {
         where: { id: userId },
         select: [ID, EMAIL],
       });
+      if (!user.email)
+        throw new BadRequestException(
+          'Добавьте подтверждённую почту, чтобы изменить пароль.',
+        );
       issuedCode = await this.tokensService.getCurrentUserPasswordResetCode(
         user.id,
       );

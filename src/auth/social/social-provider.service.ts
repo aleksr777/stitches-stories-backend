@@ -4,8 +4,10 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
+import { isEmail } from 'class-validator';
 import {
-  SocialIdentityRef,
+  SocialPendingIdentity,
+  SocialProfile,
   SocialProvider,
 } from '../entities/social-identity.entity';
 
@@ -68,7 +70,10 @@ export class SocialProviderService {
       state,
       code_challenge: socialDigest(verifier),
       code_challenge_method: provider === 'vk' ? 's256' : 'S256',
-      scope: provider === 'yandex' ? 'login:info' : 'vkid.personal_info',
+      scope:
+        provider === 'yandex'
+          ? 'login:info login:email login:default_phone'
+          : 'vkid.personal_info',
     }).toString();
     return url.toString();
   }
@@ -106,7 +111,7 @@ export class SocialProviderService {
     verifier: string,
     state: string,
     deviceId?: string,
-  ): Promise<SocialIdentityRef> {
+  ): Promise<SocialPendingIdentity> {
     const config = this.config(provider);
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -160,6 +165,29 @@ export class SocialProviderService {
       (provider === 'vk' && String(token.user_id) !== String(id))
     )
       throw new BadRequestException('Некорректный профиль провайдера.');
-    return { provider, subject: String(id) };
+    if (provider === 'vk') return { provider, subject: String(id) };
+    const clean = (value: unknown, max: number) =>
+      typeof value === 'string' && value.trim().length <= max
+        ? value.trim()
+        : '';
+    const first = clean(data.first_name, 100);
+    const last = clean(data.last_name, 100);
+    const name =
+      clean([first, last].filter(Boolean).join(' '), 200) ||
+      clean(data.real_name, 200);
+    const email = clean(data.default_email, 255).toLowerCase();
+    const phone = clean(
+      (data.default_phone as { number?: unknown } | null)?.number,
+      30,
+    );
+    const profile: SocialProfile = {
+      ...(name.length >= 2 ? { name } : {}),
+      ...(data.sex === 'male' || data.sex === 'female'
+        ? { sex: data.sex }
+        : {}),
+      ...(isEmail(email) ? { email } : {}),
+      ...(/^[+\d ()-]{6,30}$/.test(phone) ? { phone } : {}),
+    };
+    return { provider, subject: String(id), profile };
   }
 }

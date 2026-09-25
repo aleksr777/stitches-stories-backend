@@ -146,9 +146,11 @@ export class SubscriptionService {
     const user = await this.db
       .getRepository(User)
       .findOneOrFail({ where: { id: userId }, select: ['id', 'email'] });
-    const row = await this.db
-      .getRepository(Subscription)
-      .findOneBy({ email: user.email });
+    const row = user.email
+      ? await this.db
+          .getRepository(Subscription)
+          .findOneBy({ email: user.email })
+      : null;
     return {
       marketing: !!(
         row?.active &&
@@ -166,10 +168,12 @@ export class SubscriptionService {
         lock: { mode: 'pessimistic_write' },
       });
       if (purpose === 'marketing') {
-        const row = await m.findOne(Subscription, {
-          where: { email: user.email },
-          lock: { mode: 'pessimistic_write' },
-        });
+        const row = user.email
+          ? await m.findOne(Subscription, {
+              where: { email: user.email },
+              lock: { mode: 'pessimistic_write' },
+            })
+          : null;
         if (row) await this.remove(m, row, userId);
         return { accountClosed: false };
       }

@@ -2,6 +2,8 @@ export const ID = 'id';
 export const NICKNAME = 'nickname';
 export const EMAIL = 'email';
 const PHONE_NUMBER = 'phone_number';
+const CONTACT_EMAIL = 'contact_email';
+const SEX = 'sex';
 
 const NAME = 'name';
 const AGE = 'age';
@@ -22,6 +24,7 @@ export const USER_SEARCHABLE_FIELDS = [
   NAME,
   NICKNAME,
   EMAIL,
+  CONTACT_EMAIL,
   PHONE_NUMBER,
 ] as const;
 
@@ -44,6 +47,8 @@ export const USER_CONFIDENTIAL_FIELDS = [
   CREATED_AT,
   UPDATED_AT,
   EMAIL,
+  SEX,
+  CONTACT_EMAIL,
   PHONE_NUMBER,
   ROLE,
 ] as const;

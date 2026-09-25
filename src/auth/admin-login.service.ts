@@ -94,7 +94,8 @@ export class AdminLoginService {
   }
 
   async request(user: User) {
-    if (user.role !== Role.ADMIN || user.is_blocked) return this.invalid();
+    if (user.role !== Role.ADMIN || user.is_blocked || !user.email)
+      return this.invalid();
     await this.assertAttemptsAvailable(user.id);
 
     const cooldownKey = `admin-login:cooldown:${user.id}`;

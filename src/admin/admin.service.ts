@@ -89,6 +89,7 @@ export class AdminService {
             new Brackets((b) => {
               b.where('user.nickname ILIKE :q', { q })
                 .orWhere('user.email ILIKE :q', { q })
+                .orWhere('user.contact_email ILIKE :q', { q })
                 .orWhere('user.phone_number ILIKE :q', { q });
             }),
           );
@@ -155,7 +156,8 @@ export class AdminService {
       const html =
         `<p>Hello, ${user.nickname}!</p>` +
         `<p>Your account has been permanently deleted by an administrator.</p>`;
-      await this.mailService.send(user.email, subject, text, html);
+      if (user.email)
+        await this.mailService.send(user.email, subject, text, html);
     } catch (err: unknown) {
       if (qr.isTransactionActive) {
         await qr.rollbackTransaction();

@@ -10,6 +10,15 @@ import { User } from '../../users/entities/user.entity';
 
 export type SocialProvider = 'yandex' | 'vk';
 export type SocialIdentityRef = { provider: SocialProvider; subject: string };
+export type SocialProfile = {
+  name?: string;
+  sex?: 'male' | 'female';
+  phone?: string;
+  email?: string;
+};
+export type SocialPendingIdentity = SocialIdentityRef & {
+  profile?: SocialProfile;
+};
 
 @Entity('social_identity')
 @Unique(['provider', 'subject'])

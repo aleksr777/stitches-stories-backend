@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
   Header,
@@ -12,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { CookieOptions, Request, Response } from 'express';
 import { SecurityConfigService } from '../../common/security/security-config.service';
+import { AcceptanceDto } from '../../legal/legal.dto';
 import { JwtTokens } from '../../common/types/jwt-tokens.type';
 import { AuthService } from '../auth.service';
 import { SocialProvider } from '../entities/social-identity.entity';
@@ -139,10 +141,35 @@ export class SocialController {
     const identity = await this.flow.pending(
       this.cookie(req, 'social_pending'),
     );
+    if (identity.provider !== 'vk')
+      throw new BadRequestException(
+        'Для Яндекс ID используйте быструю регистрацию.',
+      );
     return this.accounts.register(identity, dto.email, {
       name: dto.name,
       documents: dto.documents,
     });
+  }
+  @Post('registration/yandex')
+  @UseGuards(RefreshOriginGuard)
+  @Header('Cache-Control', 'no-store')
+  async registerYandex(
+    @Req() req: Request,
+    @Body() dto: AcceptanceDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.limit(req);
+    const token = this.cookie(req, 'social_pending');
+    const identity = await this.flow.pending(token);
+    const user = await this.accounts.registerYandex(identity, dto.documents);
+    await this.flow.pending(token, true);
+    return this.result(
+      res,
+      await this.auth.loginNewSession(user.id, {
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      }),
+    );
   }
   @Post('login')
   @UseGuards(RefreshOriginGuard)

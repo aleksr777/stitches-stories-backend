@@ -88,7 +88,7 @@ databaseTests('Credential changes with PostgreSQL sessions', () => {
       currentRequest(),
       {
         code: CODE,
-        email: fixture.user.email,
+        email: fixture.user.email!,
         new_password: NEW_PASSWORD,
       },
       response as unknown as Response,
@@ -116,12 +116,15 @@ databaseTests('Credential changes with PostgreSQL sessions', () => {
     ).resolves.toHaveProperty('access_token');
     await expect(
       fixture.auth.validateUserByEmailAndPassword(
-        fixture.user.email,
+        fixture.user.email!,
         NEW_PASSWORD,
       ),
     ).resolves.toHaveProperty('id', fixture.user.id);
     await expect(
-      fixture.auth.validateUserByEmailAndPassword(fixture.user.email, PASSWORD),
+      fixture.auth.validateUserByEmailAndPassword(
+        fixture.user.email!,
+        PASSWORD,
+      ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(response.clearCookie).not.toHaveBeenCalled();
   });
@@ -137,7 +140,7 @@ databaseTests('Credential changes with PostgreSQL sessions', () => {
             email:
               reason === 'wrong email'
                 ? 'someone-else@example.com'
-                : fixture.user.email,
+                : fixture.user.email!,
             new_password: NEW_PASSWORD,
           },
           response as unknown as Response,
@@ -147,7 +150,7 @@ databaseTests('Credential changes with PostgreSQL sessions', () => {
       for (const old of oldSessions) await expectAccess(old, true);
       await expect(
         fixture.auth.validateUserByEmailAndPassword(
-          fixture.user.email,
+          fixture.user.email!,
           PASSWORD,
         ),
       ).resolves.toHaveProperty('id', fixture.user.id);

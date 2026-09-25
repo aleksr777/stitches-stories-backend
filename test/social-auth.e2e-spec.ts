@@ -9,6 +9,7 @@ import { SocialAccountService } from '../src/auth/social/social-account.service'
 import { RegistrationService } from '../src/auth/registration.service';
 import { createCredentialFixture, CODE } from './helpers/credential-fixture';
 import { Role } from '../src/common/types/role.enum';
+import { HashService } from '../src/common/hash-service/hash.service';
 
 const url = process.env.TEST_DATABASE_URL;
 (url ? describe : describe.skip)(
@@ -42,6 +43,8 @@ const url = process.env.TEST_DATABASE_URL;
         db,
         fixture.auth,
         {} as RegistrationService,
+        new LegalService(db),
+        new HashService(),
       );
     });
     afterAll(async () => {
@@ -93,6 +96,47 @@ const url = process.env.TEST_DATABASE_URL;
       expect(
         await db.getRepository(User).findOneBy({ email: otherEmail }),
       ).toBeNull();
+    });
+    it('creates a Yandex account from optional profile details without requiring email or merging by email', async () => {
+      const legal = new LegalService(db);
+      const identity = {
+        provider: 'yandex' as const,
+        subject: randomUUID(),
+        profile: {
+          name: 'Надежда Петрова',
+          sex: 'female' as const,
+          phone: '+79001234567',
+          email: fixture.user.email!,
+        },
+      };
+      const refs = [legal.get('pd-account'), legal.get('account-terms')];
+      const user = await accounts.registerYandex(identity, refs);
+      expect(user).toMatchObject({
+        email: null,
+        contact_email: fixture.user.email,
+        name: 'Надежда Петрова',
+        sex: 'female',
+        phone_number: '+79001234567',
+        role: Role.USER,
+      });
+      expect((await accounts.login(identity)).id).toBe(user.id);
+      expect((await accounts.find(identity))?.userId).toBe(user.id);
+      expect(
+        await db.getRepository(ConsentEvent).countBy({
+          userId: user.id,
+          verification: 'yandex-oauth',
+        }),
+      ).toBe(2);
+      await expect(accounts.registerYandex(identity, refs)).rejects.toThrow();
+      const withoutDetails = await accounts.registerYandex(
+        { provider: 'yandex', subject: randomUUID() },
+        refs,
+      );
+      expect(withoutDetails).toMatchObject({
+        email: null,
+        contact_email: null,
+        name: null,
+      });
     });
     it('does not merge identities, enforces blocking and owner restrictions, and cascades deletion', async () => {
       const identity = { provider: 'vk' as const, subject: randomUUID() };

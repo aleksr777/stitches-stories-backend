@@ -258,7 +258,7 @@ export class EmailChangeService {
       if (user.is_blocked) {
         this.errorsService.badRequest(ErrMsg.CURRENT_USER_BLOCKED);
       }
-      if (user.email.trim().toLowerCase() === newEmail) {
+      if (user.email?.trim().toLowerCase() === newEmail) {
         this.errorsService.forbidden(ErrMsg.NEW_EMAIL_MATCH_USER_EMAIL);
       }
       const isEmailTaken = await qr.manager.getRepository(User).exists({

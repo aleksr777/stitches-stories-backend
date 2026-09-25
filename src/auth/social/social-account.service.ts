@@ -7,13 +7,16 @@ import {
 import { DataSource, QueryFailedError } from 'typeorm';
 import { randomBytes } from 'node:crypto';
 import { User } from '../../users/entities/user.entity';
+import { HashService } from '../../common/hash-service/hash.service';
 import { Role } from '../../common/types/role.enum';
+import { LegalService } from '../../legal/legal.service';
 import { RegistrationDetails } from '../../legal/legal.types';
 import { AuthService } from '../auth.service';
 import { RegistrationService } from '../registration.service';
 import {
   SocialIdentity,
   SocialIdentityRef,
+  SocialPendingIdentity,
 } from '../entities/social-identity.entity';
 
 @Injectable()
@@ -22,9 +25,13 @@ export class SocialAccountService {
     private readonly db: DataSource,
     private readonly auth: AuthService,
     private readonly registration: RegistrationService,
+    private readonly legal: LegalService,
+    private readonly hash: HashService,
   ) {}
-  async find(identity: SocialIdentityRef) {
-    return this.db.getRepository(SocialIdentity).findOneBy(identity);
+  async find({ provider, subject }: SocialIdentityRef) {
+    return this.db
+      .getRepository(SocialIdentity)
+      .findOneBy({ provider, subject });
   }
   async customer(userId: number) {
     const user = await this.auth.validateUserById(userId);
@@ -50,6 +57,62 @@ export class SocialAccountService {
       details,
       identity,
     );
+  }
+  async registerYandex(
+    identity: SocialPendingIdentity,
+    documents: RegistrationDetails['documents'],
+  ) {
+    if (identity.provider !== 'yandex') throw new ForbiddenException();
+    this.legal.assertReferences(documents, ['pd-account', 'account-terms']);
+    const password = await this.hash.hash(
+      randomBytes(48).toString('base64url'),
+    );
+    const { provider, subject, profile } = identity;
+    try {
+      return await this.db.transaction(async (manager) => {
+        if (await manager.findOneBy(SocialIdentity, { provider, subject }))
+          throw new ConflictException(
+            'Этот аккаунт Яндекса уже подключён. Войдите в него.',
+          );
+        const user = await manager.save(
+          User,
+          manager.create(User, {
+            email: null,
+            contact_email: profile?.email ?? null,
+            name: profile?.name ?? null,
+            sex: profile?.sex ?? null,
+            phone_number: profile?.phone ?? null,
+            password,
+            role: Role.USER,
+          }),
+        );
+        await manager.save(
+          SocialIdentity,
+          manager.create(SocialIdentity, {
+            provider,
+            subject,
+            userId: user.id,
+          }),
+        );
+        await this.legal.record(
+          manager,
+          documents,
+          ['pd-account', 'account-terms'],
+          {
+            userId: user.id,
+            source: 'registration',
+            verification: 'yandex-oauth',
+          },
+        );
+        return user;
+      });
+    } catch (err) {
+      if (err instanceof QueryFailedError)
+        throw new ConflictException(
+          'Не удалось создать аккаунт. Начните вход через Яндекс заново.',
+        );
+      throw err;
+    }
   }
   async login(identity: SocialIdentityRef) {
     const link = await this.find(identity);

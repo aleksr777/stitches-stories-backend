@@ -49,6 +49,7 @@ export class User {
   })
   last_activity_at?: Date;
 
+  @IsOptional()
   @IsEmail()
   @Length(6, 255)
   @Column({
@@ -57,9 +58,15 @@ export class User {
     unique: true,
     select: false,
     length: 255,
-    nullable: false,
+    nullable: true,
   })
-  email!: string;
+  email!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true, select: false })
+  contact_email?: string | null;
+
+  @Column({ type: 'varchar', length: 6, nullable: true, select: false })
+  sex?: 'male' | 'female' | null;
 
   @IsPhoneNumber()
   @IsOptional()

@@ -230,7 +230,7 @@ databaseTests('Shop and consent persistence in PostgreSQL', () => {
     });
     expect((await service.status(fixture.user.id)).marketing).toBe(false);
     await db.getRepository(Subscription).save({
-      email: fixture.user.email,
+      email: fixture.user.email!,
       active: true,
       activeUntil: new Date(Date.now() + 100000),
       documents: [],

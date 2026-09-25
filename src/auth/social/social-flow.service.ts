@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { RedisService } from '../../common/redis-service/redis.service';
 import {
-  SocialIdentityRef,
+  SocialPendingIdentity,
   SocialProvider,
 } from '../entities/social-identity.entity';
 import { socialDigest, SocialProviderService } from './social-provider.service';
@@ -61,7 +61,10 @@ export class SocialFlowService {
     );
     return pending;
   }
-  async pending(token: string, consume = false): Promise<SocialIdentityRef> {
+  async pending(
+    token: string,
+    consume = false,
+  ): Promise<SocialPendingIdentity> {
     if (!valid(token))
       throw new UnauthorizedException('Начните вход через сервис заново.');
     const key = `social:pending:${socialDigest(token)}`;
@@ -72,6 +75,6 @@ export class SocialFlowService {
       throw new UnauthorizedException(
         'Время подтверждения истекло. Начните вход заново.',
       );
-    return JSON.parse(raw) as SocialIdentityRef;
+    return JSON.parse(raw) as SocialPendingIdentity;
   }
 }
