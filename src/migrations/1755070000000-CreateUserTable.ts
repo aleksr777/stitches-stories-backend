@@ -17,7 +17,6 @@ export class CreateUserTable1755070000000 implements MigrationInterface {
         "blocked_by" integer,
         "blocked_reason" varchar(255),
         "name" varchar(200),
-        "age" varchar(200),
         CONSTRAINT "PK_user_id" PRIMARY KEY ("id"),
         CONSTRAINT "UQ_user_email" UNIQUE ("email")
       )

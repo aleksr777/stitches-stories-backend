@@ -5,7 +5,6 @@ const CONTACT_EMAIL = 'contact_email';
 const SEX = 'sex';
 
 const NAME = 'name';
-const AGE = 'age';
 
 export const ROLE = 'role';
 export const PASSWORD = 'password';
@@ -33,7 +32,7 @@ const IS_BLOCKED_FIELDS = [
   BLOCKED_REASON,
 ] as const;
 
-export const USER_PUBLIC_FIELDS = [ID, NAME, AGE, LAST_ACTIVITY_AT] as const;
+export const USER_PUBLIC_FIELDS = [ID, NAME, LAST_ACTIVITY_AT] as const;
 
 export const USER_CONFIDENTIAL_FIELDS = [
   CREATED_AT,

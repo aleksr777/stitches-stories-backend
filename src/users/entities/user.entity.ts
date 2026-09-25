@@ -14,9 +14,6 @@ import {
   Length,
   IsNotEmpty,
   IsOptional,
-  Min,
-  Max,
-  IsNumber,
   MaxLength,
 } from 'class-validator';
 
@@ -146,16 +143,4 @@ export class User {
     default: null,
   })
   name?: string | null;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(200)
-  @Column({
-    type: 'smallint',
-    name: 'age',
-    nullable: true,
-    default: null,
-  })
-  age?: number | null;
 }
