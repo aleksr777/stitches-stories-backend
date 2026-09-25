@@ -13,7 +13,10 @@ import { PasswordResetService } from '../../src/auth/password-reset.service';
 import { PublicVerificationRateLimitService } from '../../src/auth/public-verification-rate-limit.service';
 import { RegistrationService } from '../../src/auth/registration.service';
 import { SessionTokenService } from '../../src/auth/session-token.service';
-import { TokensService } from '../../src/auth/tokens.service';
+import {
+  EmailChangePayload,
+  TokensService,
+} from '../../src/auth/tokens.service';
 import { EnvService } from '../../src/common/env-service/env.service';
 import { ErrorsService } from '../../src/common/errors-service/errors.service';
 import { HashService } from '../../src/common/hash-service/hash.service';
@@ -74,16 +77,33 @@ export const createCredentialFixture = async (db: DataSource) => {
     setSessionActivity: jest.fn().mockResolvedValue(undefined),
     getSessionActivities: jest.fn().mockResolvedValue(new Map()),
   } as unknown as ActivityService;
-  const mail = { validateNotServiceEmail: jest.fn() } as unknown as MailService;
+  const sendMail = jest.fn().mockResolvedValue(undefined);
+  const mail = {
+    validateNotServiceEmail: jest.fn(),
+    send: sendMail,
+  } as unknown as MailService;
   const redis = {
     ttl: jest.fn().mockResolvedValue(-2),
     del: jest.fn().mockResolvedValue(1),
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue('OK'),
   } as unknown as RedisService;
   let recoveryCodeUsed = false;
   let emailCodeUsed = false;
   const newEmail = `${randomUUID()}@example.com`;
-  const emailChange = { user_id: user.id, new_email: newEmail };
+  let emailChange: EmailChangePayload = {
+    user_id: user.id,
+    kind: 'login',
+    new_email: newEmail,
+  };
   const tokenMocks = {
+    getEmailChangeCode: jest.fn((payload: EmailChangePayload) => {
+      emailChange = payload;
+      return Promise.resolve(CODE);
+    }),
+    reserveVerificationCodeRequest: jest.fn().mockResolvedValue(60),
+    releaseVerificationCodeRequest: jest.fn().mockResolvedValue(undefined),
+    getVerificationAttemptLimit: jest.fn().mockReturnValue(5),
     assertVerificationAttemptsAvailable: jest.fn().mockResolvedValue(undefined),
     clearVerificationFailures: jest.fn().mockResolvedValue(undefined),
     registerVerificationFailure: jest.fn().mockResolvedValue(false),
@@ -192,5 +212,6 @@ export const createCredentialFixture = async (db: DataSource) => {
     tokenMocks,
     users,
     hash,
+    sendMail,
   };
 };

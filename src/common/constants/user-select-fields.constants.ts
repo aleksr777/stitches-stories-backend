@@ -1,7 +1,7 @@
 export const ID = 'id';
 export const EMAIL = 'email';
 const PHONE_NUMBER = 'phone_number';
-const CONTACT_EMAIL = 'contact_email';
+export const CONTACT_EMAIL = 'contact_email';
 const SEX = 'sex';
 
 const NAME = 'name';
@@ -59,6 +59,7 @@ export const ADMIN_FIELDS = [
 export const SPECIAL_UPDATE_FIELDS = [
   ID,
   EMAIL,
+  CONTACT_EMAIL,
   LAST_ACTIVITY_AT,
   CREATED_AT,
   UPDATED_AT,

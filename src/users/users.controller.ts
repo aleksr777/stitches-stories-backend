@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { clearRefreshCookie } from '../auth/auth-response.util';
 import { SecurityConfigService } from '../common/security/security-config.service';
 import { DeleteCurrentUserDto } from './dto/delete-current-user.dto';
+import { ContactEmailChangeRequestDto } from './dto/contact-email-change-request.dto';
 import { EmailChangeConfirmDto } from './dto/email-change-confirm.dto';
 import { EmailChangeRequestDto } from './dto/email-change-request.dto';
 import { PasswordChangeByTokenDto } from './dto/password-change.dto';
@@ -107,6 +108,36 @@ export class UsersController {
     );
     void this.audit.record({
       event: 'EMAIL_CHANGED',
+      userId: +user.id,
+      ...this.auditContext(req),
+    });
+    return result;
+  }
+
+  @Get('me/contact-email/update/status')
+  getContactEmailChangeStatus(@Req() req: Request) {
+    const user = req.user as User;
+    return this.emailChangeService.getStatus(+user.id);
+  }
+
+  @Post('me/contact-email/update/request')
+  requestContactEmailChange(
+    @Body() dto: ContactEmailChangeRequestDto,
+    @Req() req: Request,
+  ) {
+    const user = req.user as User;
+    return this.emailChangeService.requestContact(+user.id, dto);
+  }
+
+  @Post('me/contact-email/update/confirm')
+  async confirmContactEmailChange(
+    @Body() dto: EmailChangeConfirmDto,
+    @Req() req: Request,
+  ) {
+    const user = req.user as User;
+    const result = await this.emailChangeService.confirmContact(+user.id, dto);
+    void this.audit.record({
+      event: 'CONTACT_EMAIL_CHANGED',
       userId: +user.id,
       ...this.auditContext(req),
     });

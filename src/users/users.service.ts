@@ -86,11 +86,7 @@ export class UsersService {
         .filter(([, value]) => value !== undefined)
         .map(([key, value]) => [
           key,
-          typeof value === 'string'
-            ? key === 'contact_email'
-              ? value.trim().toLowerCase()
-              : value.trim()
-            : value,
+          typeof value === 'string' ? value.trim() : value,
         ]),
     ) as Record<string, unknown>;
     if (Object.keys(patch).length === 0) {

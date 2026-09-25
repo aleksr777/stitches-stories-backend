@@ -138,7 +138,7 @@ const url = process.env.TEST_DATABASE_URL;
         name: null,
       });
     });
-    it('saves profile edits and cleared Yandex details across sign-ins without changing the login identity', async () => {
+    it('changes Yandex contact email only after a code while preserving the login identity', async () => {
       const identity = {
         provider: 'yandex' as const,
         subject: randomUUID(),
@@ -157,7 +157,6 @@ const url = process.env.TEST_DATABASE_URL;
       const updated = await fixture.usersController.updatePartialUserData(
         {
           name: 'Надежда Иванова',
-          contact_email: 'new@example.test',
           phone_number: null,
           sex: null,
         },
@@ -166,10 +165,51 @@ const url = process.env.TEST_DATABASE_URL;
       expect(updated).toMatchObject({
         email: null,
         name: 'Надежда Иванова',
-        contact_email: 'new@example.test',
+        contact_email: 'old@example.test',
         phone_number: null,
         sex: null,
       });
+      await expect(
+        fixture.usersController.updatePartialUserData(
+          { contact_email: 'new@example.test' } as never,
+          { user } as never,
+        ),
+      ).rejects.toThrow();
+      await fixture.usersController.requestContactEmailChange(
+        { new_email: 'new@example.test' },
+        { user } as never,
+      );
+      expect(fixture.sendMail).toHaveBeenCalledWith(
+        'new@example.test',
+        expect.any(String),
+        expect.any(String),
+        expect.any(String),
+      );
+      expect(
+        await fixture.usersController.getCurrentProfile({ user } as never),
+      ).toHaveProperty('contact_email', 'old@example.test');
+      await expect(
+        fixture.usersController.confirmContactEmailChange({ code: '654321' }, {
+          user,
+        } as never),
+      ).rejects.toThrow();
+      expect(
+        await fixture.usersController.getCurrentProfile({ user } as never),
+      ).toHaveProperty('contact_email', 'old@example.test');
+      await expect(
+        fixture.usersController.confirmUpdateEmail({ code: CODE }, {
+          user,
+          authSessionId: 'session-id',
+        } as never),
+      ).rejects.toThrow();
+      await fixture.usersController.confirmContactEmailChange({ code: CODE }, {
+        user,
+      } as never);
+      await expect(
+        fixture.usersController.confirmContactEmailChange({ code: CODE }, {
+          user,
+        } as never),
+      ).rejects.toThrow();
       expect((await accounts.login(identity)).id).toBe(user.id);
       expect(
         await fixture.usersController.getCurrentProfile({ user } as never),
@@ -181,6 +221,36 @@ const url = process.env.TEST_DATABASE_URL;
         sex: null,
       });
       expect((await accounts.find(identity))?.userId).toBe(user.id);
+    });
+    it('removes a contact email only with a code sent to the existing address', async () => {
+      const legal = new LegalService(db);
+      const user = await accounts.registerYandex(
+        {
+          provider: 'yandex',
+          subject: randomUUID(),
+          profile: { email: 'old@example.test' },
+        },
+        [legal.get('pd-account'), legal.get('account-terms')],
+      );
+      await fixture.usersController.requestContactEmailChange(
+        { new_email: null },
+        { user } as never,
+      );
+      expect(fixture.sendMail).toHaveBeenCalledWith(
+        'old@example.test',
+        expect.any(String),
+        expect.any(String),
+        expect.any(String),
+      );
+      expect(
+        await fixture.usersController.getCurrentProfile({ user } as never),
+      ).toHaveProperty('contact_email', 'old@example.test');
+      await fixture.usersController.confirmContactEmailChange({ code: CODE }, {
+        user,
+      } as never);
+      expect(
+        await fixture.usersController.getCurrentProfile({ user } as never),
+      ).toHaveProperty('contact_email', null);
     });
     it('does not merge identities, enforces blocking and owner restrictions, and cascades deletion', async () => {
       const identity = { provider: 'vk' as const, subject: randomUUID() };

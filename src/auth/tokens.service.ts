@@ -22,6 +22,15 @@ const VERIFICATION_ATTEMPTS_PREFIX = 'verification:attempts:';
 const VERIFICATION_RESEND_PREFIX = 'verification:resend:';
 const DEFAULT_VERIFICATION_ATTEMPTS = 5;
 
+export type EmailChangePayload =
+  | { user_id: number; kind: 'login'; new_email: string }
+  | {
+      user_id: number;
+      kind: 'contact';
+      new_email: string | null;
+      old_email: string | null;
+    };
+
 @Injectable()
 export class TokensService {
   private readonly resetExpiresIn: number;
@@ -411,7 +420,7 @@ export class TokensService {
     if (activeCode === code) await this.redisService.del(activeKey);
   }
 
-  async getEmailChangeCode(value: { user_id: number; new_email: string }) {
+  async getEmailChangeCode(value: EmailChangePayload) {
     if (!value) this.errorsService.default(null, ErrMsg.PAYLOAD_NOT_DEFINED);
     return this.saveVerificationToken(
       EMAIL_CHANGE_REDIS_PREFIX,
@@ -425,7 +434,7 @@ export class TokensService {
       `${EMAIL_CHANGE_REDIS_PREFIX}${code}`,
     );
     if (!raw) return undefined;
-    return JSON.parse(raw) as { user_id: number; new_email: string };
+    return JSON.parse(raw) as EmailChangePayload;
   }
 
   async consumeEmailChangeCode(userId: number, code: string) {
@@ -435,7 +444,7 @@ export class TokensService {
       `${EMAIL_CHANGE_REDIS_PREFIX}${code}`,
     );
     if (!raw) return undefined;
-    return JSON.parse(raw) as { user_id: number; new_email: string };
+    return JSON.parse(raw) as EmailChangePayload;
   }
 
   async deleteEmailChangeCode(code: string) {
