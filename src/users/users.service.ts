@@ -82,16 +82,22 @@ export class UsersService {
     const specialFields: string[] = [];
     const emptyFields: string[] = [];
     const patch = Object.fromEntries(
-      Object.entries(dto).filter(([, value]) => value !== undefined),
+      Object.entries(dto)
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => [
+          key,
+          typeof value === 'string'
+            ? key === 'contact_email'
+              ? value.trim().toLowerCase()
+              : value.trim()
+            : value,
+        ]),
     ) as Record<string, unknown>;
     if (Object.keys(patch).length === 0) {
       this.errorsService.badRequest(ErrMsg.NO_FIELDS_FOR_UPDATE);
     }
     for (const [key, value] of Object.entries(patch)) {
-      if (
-        value === null ||
-        (typeof value === 'string' && value.trim().length === 0)
-      ) {
+      if (typeof value === 'string' && value.length === 0) {
         emptyFields.push(key);
       }
       if (SPECIAL_UPDATE_FIELDS.includes(key as specialUpdateFields)) {

@@ -138,6 +138,44 @@ const url = process.env.TEST_DATABASE_URL;
         name: null,
       });
     });
+    it('saves profile edits and cleared Yandex details across sign-ins without changing the login identity', async () => {
+      const identity = {
+        provider: 'yandex' as const,
+        subject: randomUUID(),
+        profile: {
+          name: 'Надежда Петрова',
+          sex: 'female' as const,
+          phone: '+79001234567',
+          email: 'old@example.test',
+        },
+      };
+      const legal = new LegalService(db);
+      const user = await accounts.registerYandex(identity, [
+        legal.get('pd-account'),
+        legal.get('account-terms'),
+      ]);
+      const updated = await fixture.usersController.updatePartialUserData(
+        {
+          name: 'Надежда Иванова',
+          contact_email: 'new@example.test',
+          phone_number: null,
+          sex: null,
+        },
+        { user } as never,
+      );
+      expect(updated).toMatchObject({
+        email: null,
+        name: 'Надежда Иванова',
+        contact_email: 'new@example.test',
+        phone_number: null,
+        sex: null,
+      });
+      expect((await accounts.login(identity)).id).toBe(user.id);
+      expect(
+        await fixture.usersController.getCurrentProfile({ user } as never),
+      ).toMatchObject(updated as object);
+      expect((await accounts.find(identity))?.userId).toBe(user.id);
+    });
     it('does not merge identities, enforces blocking and owner restrictions, and cascades deletion', async () => {
       const identity = { provider: 'vk' as const, subject: randomUUID() };
       await accounts.link(identity, fixture.user);

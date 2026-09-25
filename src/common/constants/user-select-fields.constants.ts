@@ -59,7 +59,6 @@ export const ADMIN_FIELDS = [
 export const SPECIAL_UPDATE_FIELDS = [
   ID,
   EMAIL,
-  /* PHONE_NUMBER, */
   LAST_ACTIVITY_AT,
   CREATED_AT,
   UPDATED_AT,
