@@ -25,8 +25,7 @@ describe('Social HTTP boundaries', () => {
   const accounts = {
     find: jest.fn(),
     customer: jest.fn(),
-    register: jest.fn(),
-    registerYandex: jest.fn(),
+    registerSocial: jest.fn(),
     login: jest.fn(),
   };
   const auth = { loginNewSession: jest.fn() };
@@ -87,8 +86,8 @@ describe('Social HTTP boundaries', () => {
     for (const path of [
       'yandex/start',
       'login',
-      'registration/request',
       'registration/yandex',
+      'registration/vk',
       'link',
     ]) {
       await client()
@@ -164,45 +163,57 @@ describe('Social HTTP boundaries', () => {
     );
     expect(response.headers['set-cookie'][0]).toContain('HttpOnly');
   });
-  it('registers from the verified Yandex identity without email or name in the request', async () => {
-    const identity = {
-      provider: 'yandex',
-      subject: 'server-verified-id',
-      profile: { name: 'Надежда Петрова', email: 'buyer@example.test' },
-    };
-    const documents = ['pd-account', 'account-terms'].map((id) => ({
-      id,
-      version: 'draft-test',
-      sha256: 'a'.repeat(64),
-    }));
-    flow.pending.mockResolvedValue(identity);
-    accounts.registerYandex.mockResolvedValue({ id: 8 });
-    auth.loginNewSession.mockResolvedValue({
-      access_token: 'access',
-      access_token_expires: 2000000000,
-      refresh_token: 'refresh',
-      refresh_token_expires: 2000000000,
-    });
-    await client()
-      .post('/api/auth/social/registration/yandex')
-      .set('Origin', origin)
-      .set('Cookie', 'social_pending=test')
-      .send({ documents, email: 'attacker@example.test' })
-      .expect(400);
-    expect(accounts.registerYandex).not.toHaveBeenCalled();
-    const response = await client()
-      .post('/api/auth/social/registration/yandex')
-      .set('Origin', origin)
-      .set('Cookie', 'social_pending=test')
-      .send({ documents })
-      .expect(201);
-    expect(accounts.registerYandex).toHaveBeenCalledWith(identity, documents);
-    expect(response.body).toEqual({
-      access_token: 'access',
-      access_token_expires: 2000000000,
-    });
-    expect(response.headers['set-cookie'][0]).toContain('HttpOnly');
-  });
+  it.each(['yandex', 'vk'])(
+    'registers from the verified %s identity without trusting request profile fields',
+    async (provider) => {
+      const identity = {
+        provider,
+        subject: 'server-verified-id',
+        profile: { name: 'Надежда Петрова', email: 'buyer@example.test' },
+      };
+      const documents = ['pd-account', 'account-terms'].map((id) => ({
+        id,
+        version: 'draft-test',
+        sha256: 'a'.repeat(64),
+      }));
+      flow.pending.mockResolvedValue(identity);
+      accounts.registerSocial.mockResolvedValue({ id: 8 });
+      auth.loginNewSession.mockResolvedValue({
+        access_token: 'access',
+        access_token_expires: 2000000000,
+        refresh_token: 'refresh',
+        refresh_token_expires: 2000000000,
+      });
+      await client()
+        .post(`/api/auth/social/registration/${provider}`)
+        .set('Origin', origin)
+        .set('Cookie', 'social_pending=test')
+        .send({ documents, email: 'attacker@example.test' })
+        .expect(400);
+      expect(accounts.registerSocial).not.toHaveBeenCalled();
+      await client()
+        .post(
+          `/api/auth/social/registration/${provider === 'vk' ? 'yandex' : 'vk'}`,
+        )
+        .set('Origin', origin)
+        .set('Cookie', 'social_pending=test')
+        .send({ documents })
+        .expect(400);
+      expect(accounts.registerSocial).not.toHaveBeenCalled();
+      const response = await client()
+        .post(`/api/auth/social/registration/${provider}`)
+        .set('Origin', origin)
+        .set('Cookie', 'social_pending=test')
+        .send({ documents })
+        .expect(201);
+      expect(accounts.registerSocial).toHaveBeenCalledWith(identity, documents);
+      expect(response.body).toEqual({
+        access_token: 'access',
+        access_token_expires: 2000000000,
+      });
+      expect(response.headers['set-cookie'][0]).toContain('HttpOnly');
+    },
+  );
   it('does not permit linking without normal password authentication', async () => {
     await client()
       .post('/api/auth/social/link')

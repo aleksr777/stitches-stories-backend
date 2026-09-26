@@ -65,6 +65,7 @@ export class SocialProviderService {
     );
     url.search = new URLSearchParams({
       client_id: config.clientId,
+      ...(provider === 'vk' ? { app_id: config.clientId } : {}),
       redirect_uri: config.redirectUri,
       response_type: 'code',
       state,
@@ -73,7 +74,7 @@ export class SocialProviderService {
       scope:
         provider === 'yandex'
           ? 'login:info login:email login:default_phone'
-          : 'vkid.personal_info',
+          : 'phone email',
     }).toString();
     return url.toString();
   }
@@ -113,27 +114,31 @@ export class SocialProviderService {
     deviceId?: string,
   ): Promise<SocialPendingIdentity> {
     const config = this.config(provider);
-    const body = new URLSearchParams({
+    const params = new URLSearchParams({
       grant_type: 'authorization_code',
-      code,
       client_id: config.clientId,
       redirect_uri: config.redirectUri,
       code_verifier: verifier,
     });
-    if (provider === 'yandex') body.set('client_secret', config.secret!);
-    else {
+    if (provider === 'yandex') {
+      params.set('client_secret', config.secret!);
+      params.set('code', code);
+    } else {
       if (!deviceId)
         throw new BadRequestException(
           'Не получен идентификатор устройства VK.',
         );
-      body.set('device_id', deviceId);
-      body.set('state', state);
+      params.set('device_id', deviceId);
+      params.set('state', state);
     }
     const token = await this.json(
       provider === 'yandex'
         ? 'https://oauth.yandex.ru/token'
-        : 'https://id.vk.ru/oauth2/auth',
-      { method: 'POST', body },
+        : `https://id.vk.ru/oauth2/auth?${params}`,
+      {
+        method: 'POST',
+        body: provider === 'yandex' ? params : new URLSearchParams({ code }),
+      },
     );
     if (
       typeof token.access_token !== 'string' ||
@@ -145,13 +150,13 @@ export class SocialProviderService {
         ? await this.json('https://login.yandex.ru/info?format=json', {
             headers: { Authorization: `OAuth ${token.access_token}` },
           })
-        : await this.json('https://id.vk.ru/oauth2/user_info', {
-            method: 'POST',
-            body: new URLSearchParams({
-              access_token: token.access_token,
-              client_id: config.clientId,
-            }),
-          });
+        : await this.json(
+            `https://id.vk.ru/oauth2/user_info?client_id=${encodeURIComponent(config.clientId)}`,
+            {
+              method: 'POST',
+              body: new URLSearchParams({ access_token: token.access_token }),
+            },
+          );
     const user =
       provider === 'vk'
         ? (data.user as Record<string, unknown> | undefined)
@@ -165,24 +170,29 @@ export class SocialProviderService {
       (provider === 'vk' && String(token.user_id) !== String(id))
     )
       throw new BadRequestException('Некорректный профиль провайдера.');
-    if (provider === 'vk') return { provider, subject: String(id) };
     const clean = (value: unknown, max: number) =>
       typeof value === 'string' && value.trim().length <= max
         ? value.trim()
         : '';
-    const first = clean(data.first_name, 100);
-    const last = clean(data.last_name, 100);
+    const first = clean(user?.first_name, 100);
+    const last = clean(user?.last_name, 100);
     const name =
       clean([first, last].filter(Boolean).join(' '), 200) ||
-      clean(data.real_name, 200);
-    const email = clean(data.default_email, 255).toLowerCase();
+      (provider === 'yandex' ? clean(data.real_name, 200) : '');
+    const email = clean(
+      provider === 'vk' ? user?.email : data.default_email,
+      255,
+    ).toLowerCase();
     const phone = clean(
-      (data.default_phone as { number?: unknown } | null)?.number,
+      provider === 'vk'
+        ? user?.phone
+        : (data.default_phone as { number?: unknown } | null)?.number,
       30,
     );
     const profile: SocialProfile = {
       ...(name.length >= 2 ? { name } : {}),
-      ...(data.sex === 'male' || data.sex === 'female'
+      ...(provider === 'yandex' &&
+      (data.sex === 'male' || data.sex === 'female')
         ? { sex: data.sex }
         : {}),
       ...(isEmail(email) ? { email } : {}),

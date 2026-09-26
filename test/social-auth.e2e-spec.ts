@@ -6,7 +6,6 @@ import { SocialIdentity } from '../src/auth/entities/social-identity.entity';
 import { LegalDocumentEntity, ConsentEvent } from '../src/legal/legal.entities';
 import { LegalService } from '../src/legal/legal.service';
 import { SocialAccountService } from '../src/auth/social/social-account.service';
-import { RegistrationService } from '../src/auth/registration.service';
 import { createCredentialFixture, CODE } from './helpers/credential-fixture';
 import { Role } from '../src/common/types/role.enum';
 import { HashService } from '../src/common/hash-service/hash.service';
@@ -42,7 +41,6 @@ const url = process.env.TEST_DATABASE_URL;
       accounts = new SocialAccountService(
         db,
         fixture.auth,
-        {} as RegistrationService,
         new LegalService(db),
         new HashService(),
       );
@@ -54,48 +52,47 @@ const url = process.env.TEST_DATABASE_URL;
         await control.destroy();
       }
     });
-    it('creates account, provider binding and document confirmations atomically', async () => {
+    it('creates a VK account with available profile fields and documents without merging by email', async () => {
       const legal = new LegalService(db);
-      const email = randomUUID() + '@example.test';
-      const identity = { provider: 'yandex' as const, subject: randomUUID() };
-      fixture.tokenMocks.consumeRegistrationCode.mockResolvedValue({
-        email,
-        password: fixture.user.password,
-        registration: {
+      const identity = {
+        provider: 'vk' as const,
+        subject: randomUUID(),
+        profile: {
           name: 'Тестовый покупатель',
-          documents: [legal.get('pd-account'), legal.get('account-terms')],
+          email: fixture.user.email!,
+          phone: '+79001234567',
         },
-        socialIdentity: identity,
+      };
+      const refs = [legal.get('pd-account'), legal.get('account-terms')];
+      const previousCount = await db.getRepository(User).count();
+      const user = await accounts.registerSocial(identity, refs);
+      expect(user).toMatchObject({
+        email: null,
+        contact_email: fixture.user.email,
+        name: 'Тестовый покупатель',
+        phone_number: '+79001234567',
+        sex: null,
+        role: Role.USER,
       });
-      await fixture.authController.confirmRegistration({ email, code: CODE }, {
-        cookie: jest.fn(),
-      } as never);
-      const user = await db.getRepository(User).findOneByOrFail({ email });
+      expect(user.id).not.toBe(fixture.user.id);
       expect((await accounts.find(identity))?.userId).toBe(user.id);
       expect(
         await db
           .getRepository(ConsentEvent)
-          .countBy({ userId: user.id, verification: 'yandex+email-code' }),
+          .countBy({ userId: user.id, verification: 'vk-oauth' }),
       ).toBe(2);
-      const otherEmail = randomUUID() + '@example.test';
-      fixture.tokenMocks.consumeRegistrationCode.mockResolvedValue({
-        email: otherEmail,
-        password: fixture.user.password,
-        registration: {
-          name: 'Другой покупатель',
-          documents: [legal.get('pd-account'), legal.get('account-terms')],
-        },
-        socialIdentity: identity,
+      await expect(accounts.registerSocial(identity, refs)).rejects.toThrow();
+      expect(await db.getRepository(User).count()).toBe(previousCount + 1);
+      const missingProfile = await accounts.registerSocial(
+        { provider: 'vk', subject: randomUUID() },
+        refs,
+      );
+      expect(missingProfile).toMatchObject({
+        email: null,
+        contact_email: null,
+        name: null,
+        phone_number: null,
       });
-      await expect(
-        fixture.authController.confirmRegistration(
-          { email: otherEmail, code: CODE },
-          { cookie: jest.fn() } as never,
-        ),
-      ).rejects.toThrow();
-      expect(
-        await db.getRepository(User).findOneBy({ email: otherEmail }),
-      ).toBeNull();
     });
     it('creates a Yandex account from optional profile details without requiring email or merging by email', async () => {
       const legal = new LegalService(db);
@@ -110,7 +107,7 @@ const url = process.env.TEST_DATABASE_URL;
         },
       };
       const refs = [legal.get('pd-account'), legal.get('account-terms')];
-      const user = await accounts.registerYandex(identity, refs);
+      const user = await accounts.registerSocial(identity, refs);
       expect(user).toMatchObject({
         email: null,
         contact_email: fixture.user.email,
@@ -127,8 +124,8 @@ const url = process.env.TEST_DATABASE_URL;
           verification: 'yandex-oauth',
         }),
       ).toBe(2);
-      await expect(accounts.registerYandex(identity, refs)).rejects.toThrow();
-      const withoutDetails = await accounts.registerYandex(
+      await expect(accounts.registerSocial(identity, refs)).rejects.toThrow();
+      const withoutDetails = await accounts.registerSocial(
         { provider: 'yandex', subject: randomUUID() },
         refs,
       );
@@ -150,7 +147,7 @@ const url = process.env.TEST_DATABASE_URL;
         },
       };
       const legal = new LegalService(db);
-      const user = await accounts.registerYandex(identity, [
+      const user = await accounts.registerSocial(identity, [
         legal.get('pd-account'),
         legal.get('account-terms'),
       ]);
@@ -226,7 +223,7 @@ const url = process.env.TEST_DATABASE_URL;
     });
     it('removes a contact email only with a code sent to the existing address', async () => {
       const legal = new LegalService(db);
-      const user = await accounts.registerYandex(
+      const user = await accounts.registerSocial(
         {
           provider: 'yandex',
           subject: randomUUID(),

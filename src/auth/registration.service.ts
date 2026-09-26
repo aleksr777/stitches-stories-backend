@@ -1,8 +1,4 @@
 import { LegalService } from '../legal/legal.service';
-import {
-  SocialIdentity,
-  SocialIdentityRef,
-} from './entities/social-identity.entity';
 import { RegistrationDetails } from '../legal/legal.types';
 import { HttpException, Injectable, ConflictException } from '@nestjs/common';
 import { Repository, DataSource, QueryFailedError } from 'typeorm';
@@ -148,7 +144,6 @@ export class RegistrationService {
     email: string,
     password: string,
     registration: RegistrationDetails,
-    socialIdentity?: SocialIdentityRef,
   ) {
     this.legal.assertReferences(registration.documents, [
       'pd-account',
@@ -177,7 +172,6 @@ export class RegistrationService {
           email: normalizedEmail,
           password: hashedPassword,
           registration,
-          socialIdentity,
         });
         await this.sendRegistrationCode(normalizedEmail, issuedCode);
         await this.tokensService.clearVerificationFailures(
@@ -279,15 +273,6 @@ export class RegistrationService {
         name: data.registration.name,
       });
       await qr.manager.save(User, newUser);
-      if (data.socialIdentity) {
-        await qr.manager.save(
-          SocialIdentity,
-          qr.manager.create(SocialIdentity, {
-            ...data.socialIdentity,
-            userId: newUser.id,
-          }),
-        );
-      }
       await this.legal.record(
         qr.manager,
         data.registration.documents,
@@ -295,9 +280,7 @@ export class RegistrationService {
         {
           userId: newUser.id,
           source: 'registration',
-          verification: data.socialIdentity
-            ? `${data.socialIdentity.provider}+email-code`
-            : 'email-code',
+          verification: 'email-code',
         },
       );
       await qr.commitTransaction();

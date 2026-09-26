@@ -12,7 +12,6 @@ import { Role } from '../../common/types/role.enum';
 import { LegalService } from '../../legal/legal.service';
 import { RegistrationDetails } from '../../legal/legal.types';
 import { AuthService } from '../auth.service';
-import { RegistrationService } from '../registration.service';
 import {
   SocialIdentity,
   SocialIdentityRef,
@@ -24,7 +23,6 @@ export class SocialAccountService {
   constructor(
     private readonly db: DataSource,
     private readonly auth: AuthService,
-    private readonly registration: RegistrationService,
     private readonly legal: LegalService,
     private readonly hash: HashService,
   ) {}
@@ -42,27 +40,10 @@ export class SocialAccountService {
       );
     return user;
   }
-  async register(
-    identity: SocialIdentityRef,
-    email: string,
-    details: RegistrationDetails,
-  ) {
-    if (await this.find(identity))
-      throw new ConflictException(
-        'Этот аккаунт сервиса уже подключён. Начните вход заново.',
-      );
-    return this.registration.request(
-      email,
-      randomBytes(48).toString('base64url'),
-      details,
-      identity,
-    );
-  }
-  async registerYandex(
+  async registerSocial(
     identity: SocialPendingIdentity,
     documents: RegistrationDetails['documents'],
   ) {
-    if (identity.provider !== 'yandex') throw new ForbiddenException();
     this.legal.assertReferences(documents, ['pd-account', 'account-terms']);
     const password = await this.hash.hash(
       randomBytes(48).toString('base64url'),
@@ -72,7 +53,7 @@ export class SocialAccountService {
       return await this.db.transaction(async (manager) => {
         if (await manager.findOneBy(SocialIdentity, { provider, subject }))
           throw new ConflictException(
-            'Этот аккаунт Яндекса уже подключён. Войдите в него.',
+            'Этот аккаунт сервиса уже подключён. Войдите в него.',
           );
         const user = await manager.save(
           User,
@@ -101,7 +82,7 @@ export class SocialAccountService {
           {
             userId: user.id,
             source: 'registration',
-            verification: 'yandex-oauth',
+            verification: `${provider}-oauth`,
           },
         );
         return user;
@@ -109,7 +90,7 @@ export class SocialAccountService {
     } catch (err) {
       if (err instanceof QueryFailedError)
         throw new ConflictException(
-          'Не удалось создать аккаунт. Начните вход через Яндекс заново.',
+          'Не удалось создать аккаунт. Начните вход через сервис заново.',
         );
       throw err;
     }

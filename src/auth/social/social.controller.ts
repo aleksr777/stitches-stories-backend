@@ -22,7 +22,6 @@ import { PublicVerificationRateLimitService } from '../public-verification-rate-
 import { SocialAccountService } from './social-account.service';
 import { SocialFlowService } from './social-flow.service';
 import { SocialProviderService } from './social-provider.service';
-import { SocialRegistrationDto } from './social.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { User } from '../../users/entities/user.entity';
 
@@ -133,27 +132,11 @@ export class SocialController {
     if (link) await this.accounts.customer(link.userId);
     return { provider: identity.provider, registered: Boolean(link) };
   }
-  @Post('registration/request')
+  @Post('registration/:provider')
   @UseGuards(RefreshOriginGuard)
   @Header('Cache-Control', 'no-store')
-  async register(@Req() req: Request, @Body() dto: SocialRegistrationDto) {
-    await this.limit(req);
-    const identity = await this.flow.pending(
-      this.cookie(req, 'social_pending'),
-    );
-    if (identity.provider !== 'vk')
-      throw new BadRequestException(
-        'Для Яндекс ID используйте быструю регистрацию.',
-      );
-    return this.accounts.register(identity, dto.email, {
-      name: dto.name,
-      documents: dto.documents,
-    });
-  }
-  @Post('registration/yandex')
-  @UseGuards(RefreshOriginGuard)
-  @Header('Cache-Control', 'no-store')
-  async registerYandex(
+  async register(
+    @Param('provider') provider: SocialProvider,
     @Req() req: Request,
     @Body() dto: AcceptanceDto,
     @Res({ passthrough: true }) res: Response,
@@ -161,7 +144,9 @@ export class SocialController {
     await this.limit(req);
     const token = this.cookie(req, 'social_pending');
     const identity = await this.flow.pending(token);
-    const user = await this.accounts.registerYandex(identity, dto.documents);
+    if (provider !== identity.provider || !['yandex', 'vk'].includes(provider))
+      throw new BadRequestException('Начните вход через сервис заново.');
+    const user = await this.accounts.registerSocial(identity, dto.documents);
     await this.flow.pending(token, true);
     return this.result(
       res,

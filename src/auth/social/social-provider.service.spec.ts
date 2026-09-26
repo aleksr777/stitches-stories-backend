@@ -96,15 +96,56 @@ describe('Social provider protocol validation', () => {
     });
   });
   it('checks VK state, device ID and user ID against the authenticated user_info endpoint', async () => {
-    global.fetch = jest
+    const url = new URL(service.authorize('vk', 'expected', 'v'.repeat(43)));
+    expect(url.searchParams.get('scope')).toBe('phone email');
+    expect(url.searchParams.get('app_id')).toBe('123');
+    expect(url.searchParams.get('code_challenge_method')).toBe('s256');
+    const mock = jest
       .fn()
       .mockResolvedValueOnce(
         json({ access_token: 'test', user_id: 42, state: 'expected' }),
       )
-      .mockResolvedValueOnce(json({ user: { user_id: '42' } }));
+      .mockResolvedValueOnce(
+        json({
+          user: {
+            user_id: '42',
+            first_name: 'Александр',
+            last_name: 'Петров',
+            email: 'Buyer@Example.test',
+            phone: '+79001234567',
+          },
+        }),
+      );
+    global.fetch = mock;
     expect(
       await service.exchange('vk', 'code', 'verifier', 'expected', 'device'),
-    ).toEqual({ provider: 'vk', subject: '42' });
+    ).toEqual({
+      provider: 'vk',
+      subject: '42',
+      profile: {
+        name: 'Александр Петров',
+        email: 'buyer@example.test',
+        phone: '+79001234567',
+      },
+    });
+    const requests = mock.mock.calls as unknown as [string, RequestInit][];
+    const tokenCall = requests[0];
+    const tokenUrl = new URL(tokenCall[0]);
+    expect(tokenUrl.searchParams.get('client_id')).toBe('123');
+    expect(tokenUrl.searchParams.get('device_id')).toBe('device');
+    expect(tokenUrl.searchParams.get('state')).toBe('expected');
+    expect(tokenUrl.searchParams.get('code_verifier')).toBe('verifier');
+    expect(
+      new URLSearchParams(tokenCall[1].body as URLSearchParams).get('code'),
+    ).toBe('code');
+    expect(requests[1][0]).toBe(
+      'https://id.vk.ru/oauth2/user_info?client_id=123',
+    );
+    expect(
+      new URLSearchParams(requests[1][1].body as URLSearchParams).get(
+        'access_token',
+      ),
+    ).toBe('test');
     global.fetch = jest
       .fn()
       .mockResolvedValueOnce(
@@ -126,5 +167,18 @@ describe('Social provider protocol validation', () => {
     await expect(
       service.exchange('vk', 'code', 'verifier', 'expected', 'device'),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+  it('keeps VK sign-in usable when optional profile fields are missing or invalid', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        json({ access_token: 'test', user_id: '52', state: 'expected' }),
+      )
+      .mockResolvedValueOnce(
+        json({ user: { user_id: '52', email: 'invalid', phone: 'nope' } }),
+      );
+    await expect(
+      service.exchange('vk', 'code', 'verifier', 'expected', 'device'),
+    ).resolves.toEqual({ provider: 'vk', subject: '52', profile: {} });
   });
 });
